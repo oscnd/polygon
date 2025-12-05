@@ -1,0 +1,12 @@
+# development
+.vscode
+.idea
+
+# environment
+.env
+
+# local
+.local
+
+# operating system
+.DS_Store
