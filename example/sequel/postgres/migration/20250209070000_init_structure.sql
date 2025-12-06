@@ -10,6 +10,7 @@ CREATE TABLE users
     password_hash VARCHAR(255) NOT NULL,
     totp_secret   VARCHAR(255) NULL,
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    metadata      JSONB        NOT NULL,
     created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -47,7 +48,7 @@ CREATE TABLE posts
     updated_at TIMESTAMP                                         NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE media
+CREATE TABLE medias
 (
     id         BIGSERIAL PRIMARY KEY,
     post_id    BIGINT REFERENCES posts (id) ON DELETE CASCADE NOT NULL,

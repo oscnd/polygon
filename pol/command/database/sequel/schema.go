@@ -10,6 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"go.scnd.dev/polygon/external/sqlc/config"
 	"go.scnd.dev/polygon/external/sqlc/migrations"
 )
 
@@ -154,7 +155,7 @@ func SchemaGenerate(migrationDir, dirName, dialect string) error {
 	}
 
 	// * construct schema file path
-	schemaDir := filepath.Join("polygon", "generate", "sequel")
+	schemaDir := filepath.Join("generate", "polygon", "sequel")
 	schemaFile := filepath.Join(schemaDir, fmt.Sprintf("%s.sql", dirName))
 
 	// * ensure directory
@@ -165,6 +166,22 @@ func SchemaGenerate(migrationDir, dirName, dialect string) error {
 	err = os.WriteFile(schemaFile, []byte(schemaContent.String()), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write schema file: %w", err)
+	}
+
+	// * parse sqlc.yml for type overrides
+	sqlcConfigPath := filepath.Join("sqlc.yml")
+	var sqlcConfig config.Config
+
+	if configData, err := os.ReadFile(sqlcConfigPath); err == nil {
+		if parsedConfig, parseErr := config.ParseConfig(strings.NewReader(string(configData))); parseErr == nil {
+			sqlcConfig = parsedConfig
+		}
+	}
+
+	// * generate Go structs using sqlc catalog
+	err = Model(migrationFiles, dirName, dialect, sqlcConfig)
+	if err != nil {
+		return fmt.Errorf("failed to generate Go structs: %w", err)
 	}
 
 	return nil
