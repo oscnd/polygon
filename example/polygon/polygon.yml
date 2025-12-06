@@ -1,5 +1,5 @@
 dir: pol
-server: {{ env.POLYGON_SERVER | "localhost:3001/pol" }}
+server: {{ env.POLYGON_SERVER || "localhost:3001/pol" }}
 dialect: postgres
 initializers:
   config:

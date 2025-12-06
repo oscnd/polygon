@@ -125,12 +125,6 @@ CREATE TRIGGER auto_updated_at_posts
     FOR EACH ROW
 EXECUTE FUNCTION auto_updated_at();
 
-CREATE TRIGGER auto_updated_at_media
-    BEFORE UPDATE
-    ON media
-    FOR EACH ROW
-EXECUTE FUNCTION auto_updated_at();
-
 CREATE TRIGGER auto_updated_at_comments
     BEFORE UPDATE
     ON comments
