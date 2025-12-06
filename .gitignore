@@ -7,6 +7,7 @@
 
 # local
 .local
+generate/
 /external/*
 !/external/go.*
 

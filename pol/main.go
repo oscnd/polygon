@@ -28,7 +28,7 @@ func main() {
 			return
 		}
 		if args[2] == "sequel" && args[3] == "schema" {
-			err := sequel.GenerateSchemas()
+			err := sequel.Schema()
 			if err != nil {
 				log.Fatalf("Error generating schemas: %v", err)
 			}
