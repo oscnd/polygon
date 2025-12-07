@@ -11,6 +11,7 @@ import (
 	"go.scnd.dev/polygon/external/sqlc/engine/postgresql"
 	"go.scnd.dev/polygon/external/sqlc/migrations"
 	"go.scnd.dev/polygon/external/sqlc/sql/catalog"
+	"go.scnd.dev/polygon/pol/index"
 	"go.scnd.dev/polygon/polygon/util"
 	"gopkg.in/yaml.v3"
 )
@@ -38,7 +39,7 @@ type AdditionConfig struct {
 	Type    string `yaml:"type"`
 }
 
-func Model(migrationFiles []string, dirName, dialect string, sqlc config.Config, sequelConfig *SequelConfig) error {
+func Model(app index.App, migrationFiles []string, dirName, dialect string, sqlc config.Config, sequelConfig *SequelConfig) error {
 	// * create sqlc catalog
 	cat := catalog.New("public")
 
@@ -806,7 +807,7 @@ func ModelExtractAdditionImports(additions []AdditionConfig) []string {
 	return imports
 }
 
-func ModelUpdateSequelConfig(configPath string, tables map[string]*Table, configExists bool) error {
+func ModelUpdateSequelConfig(app index.App, configPath string, tables map[string]*Table, configExists bool) error {
 	var config *SequelConfig
 
 	// * read existing config or create new one
@@ -875,7 +876,9 @@ func ModelUpdateSequelConfig(configPath string, tables map[string]*Table, config
 			return fmt.Errorf("failed to write sequel.yml: %w", err)
 		}
 
-		log.Printf("Updated sequel.yml with missing tables and fields")
+		if *app.Verbose() {
+			log.Printf("updated sequel configuration with mapping")
+		}
 	}
 
 	return nil

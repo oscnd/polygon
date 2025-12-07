@@ -14,8 +14,13 @@ import (
 )
 
 type App struct {
+	verbose   *bool
 	directory *string
 	config    *index.Config
+}
+
+func (a *App) Verbose() *bool {
+	return a.verbose
 }
 
 func (a *App) Directory() *string {
@@ -28,11 +33,13 @@ func (a *App) Config() *index.Config {
 
 func main() {
 	app := &App{
+		verbose:   new(bool),
 		directory: new(string),
 		config:    nil,
 	}
 
 	// * parse directory flag
+	flag.BoolVar(app.verbose, "v", false, "Verbose output")
 	flag.StringVar(app.directory, "d", "", "Directory path")
 	flag.Parse()
 
@@ -49,7 +56,7 @@ func main() {
 	}
 
 	if len(args) == 0 {
-		if *app.directory == "" {
+		if *app.Directory() == "" {
 			fmt.Printf("Polygon Command Line Interface\n\n")
 			fmt.Printf("Usage:\n")
 			fmt.Printf("  %s -d <directory> <subcommand>\n\n", filepath.Base(os.Args[0]))
@@ -66,7 +73,7 @@ func main() {
 
 	// * load config
 	var err error
-	app.config, err = config.New[index.Config](*app.directory)
+	app.config, err = config.New[index.Config](*app.Directory())
 	if err != nil {
 		log.Fatalf("config error: %v", err)
 	}

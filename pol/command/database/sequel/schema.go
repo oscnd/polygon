@@ -44,7 +44,7 @@ func Schema(app index.App) error {
 
 		// * generate schema for this directory
 		// TODO: support multiple dialects
-		err := SchemaGenerate(migrationDir, dirName, "postgres")
+		err := SchemaGenerate(app, migrationDir, dirName, "postgres")
 		if err != nil {
 			log.Printf("Error generating schema for %s: %v", dirName, err)
 			continue
@@ -56,7 +56,7 @@ func Schema(app index.App) error {
 	return nil
 }
 
-func SchemaGenerate(migrationDir, dirName, dialect string) error {
+func SchemaGenerate(app index.App, migrationDir, dirName, dialect string) error {
 	// * find all sql files in migration directory
 	migrationFiles := make([]string, 0)
 	entries, err := os.ReadDir(migrationDir)
@@ -159,7 +159,7 @@ func SchemaGenerate(migrationDir, dirName, dialect string) error {
 	}
 
 	// * parse sequel.yml for additions/contractions
-	sequelConfigPath := filepath.Join("polygon", "sequel.yml")
+	sequelConfigPath := filepath.Join(*app.Directory(), "sequel.yml")
 	var sequelConfig *SequelConfig
 	configExists := true
 	if configData, err := os.ReadFile(sequelConfigPath); err == nil {
@@ -173,13 +173,13 @@ func SchemaGenerate(migrationDir, dirName, dialect string) error {
 	}
 
 	// * generate Go structs using sqlc catalog
-	err = Model(migrationFiles, dirName, dialect, sqlcConfig, sequelConfig)
+	err = Model(app, migrationFiles, dirName, dialect, sqlcConfig, sequelConfig)
 	if err != nil {
 		return fmt.Errorf("failed to generate Go structs: %w", err)
 	}
 
 	// * update sequel.yml with missing tables and fields
-	err = ModelUpdateSequelConfig(sequelConfigPath, tables, configExists)
+	err = ModelUpdateSequelConfig(app, sequelConfigPath, tables, configExists)
 	if err != nil {
 		return fmt.Errorf("failed to update sequel.yml: %w", err)
 	}

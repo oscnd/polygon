@@ -107,7 +107,27 @@ sequels:
                         include: true
                 additions: []
             users:
-                fields: {}
+                fields:
+                    created_at:
+                        include: true
+                    email:
+                        include: true
+                    id:
+                        include: true
+                    is_active:
+                        include: true
+                    metadata:
+                        include: true
+                    oid:
+                        include: true
+                    password_hash:
+                        include: true
+                    totp_secret:
+                        include: true
+                    updated_at:
+                        include: true
+                    username:
+                        include: true
                 additions:
                     - name: picture_url
                       package: ""
