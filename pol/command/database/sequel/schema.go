@@ -8,35 +8,13 @@ import (
 	"sort"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"go.scnd.dev/polygon/external/sqlc/config"
 	"go.scnd.dev/polygon/external/sqlc/migrations"
+	"go.scnd.dev/polygon/pol/index"
 )
 
-func Schema() error {
-	// * read polygon.yml to get dialect
-	configPath := filepath.Join("polygon.yml")
-	configData, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read polygon.yml: %w", err)
-	}
-
-	var polygonConfig PolygonConfig
-	err = yaml.Unmarshal(configData, &polygonConfig)
-	if err != nil {
-		return fmt.Errorf("failed to parse polygon.yml: %w", err)
-	}
-
-	// * validate dialect
-	switch polygonConfig.Dialect {
-	case "postgres", "postgresql", "mysql", "sqlite":
-		// * supported dialects
-	default:
-		return fmt.Errorf("unsupported dialect: %s (supported: postgres, mysql, sqlite)", polygonConfig.Dialect)
-	}
-
-	// * find all directories in ./sequel
+func Schema(app index.App) error {
+	// * find all directories
 	sequelDir := filepath.Join("sequel")
 	entries, err := os.ReadDir(sequelDir)
 	if err != nil {
@@ -64,7 +42,8 @@ func Schema() error {
 		log.Printf("Processing schema for %s...", dirName)
 
 		// * generate schema for this directory
-		err := SchemaGenerate(migrationDir, dirName, polygonConfig.Dialect)
+		// TODO: support multiple dialects
+		err := SchemaGenerate(migrationDir, dirName, "postgres")
 		if err != nil {
 			log.Printf("Error generating schema for %s: %v", dirName, err)
 			continue

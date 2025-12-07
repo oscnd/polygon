@@ -393,11 +393,6 @@ func ParseAlterTable(lines []string, index *int, tables map[string]*Table) {
 	}
 }
 
-type PolygonConfig struct {
-	Dir     string `yaml:"dir"`
-	Dialect string `yaml:"dialect"`
-}
-
 type Column struct {
 	Name        string
 	Type        string
