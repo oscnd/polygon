@@ -11,6 +11,7 @@ import (
 	"go.scnd.dev/polygon/external/sqlc/config"
 	"go.scnd.dev/polygon/external/sqlc/migrations"
 	"go.scnd.dev/polygon/pol/index"
+	"gopkg.in/yaml.v3"
 )
 
 func Schema(app index.App) error {
@@ -157,10 +158,30 @@ func SchemaGenerate(migrationDir, dirName, dialect string) error {
 		}
 	}
 
+	// * parse sequel.yml for additions/contractions
+	sequelConfigPath := filepath.Join("polygon", "sequel.yml")
+	var sequelConfig *SequelConfig
+	configExists := true
+	if configData, err := os.ReadFile(sequelConfigPath); err == nil {
+		if err := yaml.Unmarshal(configData, &sequelConfig); err != nil {
+			return fmt.Errorf("failed to parse sequel.yml: %w", err)
+		}
+	} else {
+		// * file not found is not fatal, create new config
+		sequelConfig = &SequelConfig{Sequels: make(map[string]DialectConfig)}
+		configExists = false
+	}
+
 	// * generate Go structs using sqlc catalog
-	err = Model(migrationFiles, dirName, dialect, sqlcConfig)
+	err = Model(migrationFiles, dirName, dialect, sqlcConfig, sequelConfig)
 	if err != nil {
 		return fmt.Errorf("failed to generate Go structs: %w", err)
+	}
+
+	// * update sequel.yml with missing tables and fields
+	err = ModelUpdateSequelConfig(sequelConfigPath, tables, configExists)
+	if err != nil {
+		return fmt.Errorf("failed to update sequel.yml: %w", err)
 	}
 
 	return nil

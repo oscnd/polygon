@@ -12,9 +12,33 @@ import (
 	"go.scnd.dev/polygon/external/sqlc/migrations"
 	"go.scnd.dev/polygon/external/sqlc/sql/catalog"
 	"go.scnd.dev/polygon/polygon/util"
+	"gopkg.in/yaml.v3"
 )
 
-func Model(migrationFiles []string, dirName, dialect string, sqlc config.Config) error {
+type SequelConfig struct {
+	Sequels map[string]DialectConfig `yaml:"sequels"`
+}
+
+type DialectConfig struct {
+	Tables map[string]TableConfig `yaml:"tables"`
+}
+
+type TableConfig struct {
+	Fields    map[string]FieldConfig `yaml:"fields"`
+	Additions []AdditionConfig       `yaml:"additions"`
+}
+
+type FieldConfig struct {
+	Include bool `yaml:"include"`
+}
+
+type AdditionConfig struct {
+	Name    string `yaml:"name"`
+	Package string `yaml:"package"`
+	Type    string `yaml:"type"`
+}
+
+func Model(migrationFiles []string, dirName, dialect string, sqlc config.Config, sequelConfig *SequelConfig) error {
 	// * create sqlc catalog
 	cat := catalog.New("public")
 
@@ -51,7 +75,7 @@ func Model(migrationFiles []string, dirName, dialect string, sqlc config.Config)
 	// * generate Go structs for each table
 	for _, schema := range cat.Schemas {
 		for _, table := range schema.Tables {
-			if err := ModelGenerate(table, dirName, tables, sqlc); err != nil {
+			if err := ModelGenerate(table, dirName, tables, sqlc, sequelConfig); err != nil {
 				return fmt.Errorf("failed to generate model for table %s: %w", table.Rel.Name, err)
 			}
 		}
@@ -60,10 +84,10 @@ func Model(migrationFiles []string, dirName, dialect string, sqlc config.Config)
 	return nil
 }
 
-func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Table, sqlc config.Config) error {
+func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Table, sqlc config.Config, sequelConfig *SequelConfig) error {
 	// * construct model file paths using singular table name
 	singularTableName := util.ToSingular(table.Rel.Name)
-	generatedModelDir := filepath.Join("polygon", "model")
+	generatedModelDir := filepath.Join("generate", "polygon", "model")
 	generatedModelFile := filepath.Join(generatedModelDir, fmt.Sprintf("%s.%s.go", dirName, singularTableName))
 
 	// * ensure output directory exists
@@ -79,6 +103,26 @@ func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Tabl
 			return fmt.Errorf("failed to read existing model file: %w", err)
 		}
 		existingContent = string(content)
+	}
+
+	// * get table config from sequel.yml
+	var tableConfig *TableConfig
+	if sequelConfig != nil && sequelConfig.Sequels != nil {
+		if dialectConfig, exists := sequelConfig.Sequels["postgres"]; exists {
+			if tc, exists := dialectConfig.Tables[table.Rel.Name]; exists {
+				tableConfig = &tc
+			}
+		}
+	}
+
+	// * validate sequel.yml config if exists
+	if tableConfig != nil {
+		if err := ModelValidateFields(tableConfig, table); err != nil {
+			return err
+		}
+		if err := ModelValidateAdditions(tableConfig.Additions, table); err != nil {
+			return err
+		}
 	}
 
 	// * collect required imports from overrides - only include imports used by this table
@@ -100,6 +144,12 @@ func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Tabl
 		}
 	}
 
+	// * add imports from addition config
+	if tableConfig != nil {
+		additionImports := ModelExtractAdditionImports(tableConfig.Additions)
+		requiredImports = append(requiredImports, additionImports...)
+	}
+
 	// * parse existing structs
 	existingStructs := ModelParseExistingStructs(existingContent)
 
@@ -109,9 +159,16 @@ func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Tabl
 	// * generate main struct
 	mainStruct := ModelGenerateMainStruct(structName, table, &sqlc)
 
-	// * generate or get addition/contraction structs
-	additionStruct := ModelGetOrCreateStruct(existingStructs, structName+"Addition", true)
-	contractionStruct := ModelGetOrCreateStruct(existingStructs, structName+"Contraction", true)
+	// * generate addition/contraction structs from config
+	var additionStruct, contractionStruct string
+	if tableConfig != nil {
+		additionStruct = ModelGenerateAdditionStruct(structName, tableConfig.Additions)
+		contractionStruct = ModelGenerateContractionStruct(structName, tableConfig.Fields)
+	} else {
+		// * default to empty structs if no config
+		additionStruct = fmt.Sprintf("type %sAddition struct {\n}\n", structName)
+		contractionStruct = fmt.Sprintf("type %sContraction struct {\n}\n", structName)
+	}
 
 	// * generate ModelAdded struct using reflection
 	addedStruct := ModelGenerateAdded(structName, table, additionStruct, contractionStruct, &sqlc)
@@ -335,7 +392,26 @@ func ModelGenerateAdded(baseName string, table *catalog.Table, additionStruct, c
 	// * add fields from addition that aren't in contraction
 	for fieldName, fieldType := range additionFields {
 		if _, exists := contractionFields[fieldName]; !exists {
-			builder.WriteString(fmt.Sprintf("    %s %s\n", fieldName, fieldType))
+			// * check if we have JSON tag stored from parsing
+			jsonTag := util.ToCamelCase(fieldName)
+			cleanFieldType := fieldType
+			if strings.Contains(fieldType, "|") {
+				parts := strings.Split(fieldType, "|")
+				if len(parts) == 2 {
+					cleanFieldType = parts[0]
+					jsonTag = parts[1]
+				}
+			} else if strings.Contains(fieldType, "`json:") {
+				// * fallback: parse JSON tag from field type
+				start := strings.Index(fieldType, "`json:\"") + 7
+				end := strings.Index(fieldType[start:], "\"")
+				if end != -1 {
+					jsonTag = fieldType[start : start+end]
+				}
+				// * remove backticks from field type
+				cleanFieldType = strings.Fields(fieldType)[1]
+			}
+			builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", fieldName, cleanFieldType, jsonTag))
 		}
 	}
 
@@ -365,11 +441,22 @@ func ModelParseStructFields(structContent string) map[string]string {
 			if len(parts) >= 2 {
 				fieldName := parts[0]
 				fieldType := parts[1]
-				// * remove backticks if present
-				if strings.Contains(fieldType, "`") {
-					fieldType = parts[1]
+				// * check for JSON tag in the complete line
+				if strings.Contains(trimmed, "`json:") {
+					// * extract JSON tag for proper camelCase
+					start := strings.Index(trimmed, "`json:\"") + 7
+					end := strings.Index(trimmed[start:], "\"")
+					if end != -1 {
+						jsonTag := trimmed[start : start+end]
+						// * remove backticks from field type
+						cleanFieldType := strings.TrimSuffix(fieldType, "`")
+						fields[fieldName] = cleanFieldType + "|" + jsonTag
+					} else {
+						fields[fieldName] = fieldType
+					}
+				} else {
+					fields[fieldName] = fieldType
 				}
-				fields[fieldName] = fieldType
 			}
 		}
 	}
@@ -604,4 +691,192 @@ func ModelGenerateFileContent(orderedStructs []string, requiredImports []string)
 	// * TODO: preserve other non-struct declarations from existing content
 
 	return builder.String()
+}
+
+func ModelValidateFields(tableConfig *TableConfig, table *catalog.Table) error {
+	for fieldName, fieldConfig := range tableConfig.Fields {
+		if fieldConfig.Include {
+			// * check if field exists in database schema
+			found := false
+			for _, col := range table.Columns {
+				if col.Name == fieldName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("field '%s' from sequel.yml not found in table '%s' database schema", fieldName, table.Rel.Name)
+			}
+		}
+	}
+	return nil
+}
+
+func ModelValidateAdditions(additions []AdditionConfig, table *catalog.Table) error {
+	for _, addition := range additions {
+		// * check if addition conflicts with existing columns
+		for _, col := range table.Columns {
+			if col.Name == addition.Name {
+				return fmt.Errorf("addition '%s' conflicts with existing column in table '%s'", addition.Name, table.Rel.Name)
+			}
+		}
+	}
+	return nil
+}
+
+func ModelGenerateAdditionStruct(structName string, additions []AdditionConfig) string {
+	if len(additions) == 0 {
+		return fmt.Sprintf("type %sAddition struct {\n}\n", structName)
+	}
+
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("type %sAddition struct {\n", structName))
+
+	for _, addition := range additions {
+		fieldType := ModelConvertAdditionType(addition)
+		builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n",
+			util.ToTitleCase(addition.Name), fieldType, util.ToCamelCase(addition.Name)))
+	}
+
+	builder.WriteString("}\n")
+	return builder.String()
+}
+
+func ModelGenerateContractionStruct(structName string, fields map[string]FieldConfig) string {
+	// * find excluded fields (include: false)
+	var excludedFields []string
+	for fieldName, fieldConfig := range fields {
+		if !fieldConfig.Include {
+			excludedFields = append(excludedFields, fieldName)
+		}
+	}
+
+	if len(excludedFields) == 0 {
+		return fmt.Sprintf("type %sContraction struct {\n}\n", structName)
+	}
+
+	// * generate struct with excluded fields only
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("type %sContraction struct {\n", structName))
+	for _, field := range excludedFields {
+		builder.WriteString(fmt.Sprintf("    %s any `json:\"%s\"`\n",
+			util.ToTitleCase(field), util.ToCamelCase(field)))
+	}
+	builder.WriteString("}\n")
+	return builder.String()
+}
+
+func ModelConvertAdditionType(addition AdditionConfig) string {
+	// * if package specified, use qualified type name
+	if addition.Package != "" {
+		// * extract package name from path
+		pathParts := strings.Split(addition.Package, "/")
+		packageName := pathParts[len(pathParts)-1]
+		return "*" + packageName + "." + addition.Type
+	}
+
+	// * default to pointer type
+	switch strings.ToLower(addition.Type) {
+	case "string":
+		return "*string"
+	case "int", "int64":
+		return "*int64"
+	case "uint64":
+		return "*uint64"
+	case "bool":
+		return "*bool"
+	case "time", "timestamp":
+		return "*time.Time"
+	default:
+		return "*" + addition.Type
+	}
+}
+
+func ModelExtractAdditionImports(additions []AdditionConfig) []string {
+	var imports []string
+	seen := make(map[string]bool)
+
+	for _, addition := range additions {
+		if addition.Package != "" && !seen[addition.Package] {
+			imports = append(imports, addition.Package)
+			seen[addition.Package] = true
+		}
+	}
+
+	return imports
+}
+
+func ModelUpdateSequelConfig(configPath string, tables map[string]*Table, configExists bool) error {
+	var config *SequelConfig
+
+	// * read existing config or create new one
+	if configExists {
+		configData, err := os.ReadFile(configPath)
+		if err != nil {
+			return fmt.Errorf("failed to read existing sequel.yml: %w", err)
+		}
+		if err := yaml.Unmarshal(configData, &config); err != nil {
+			return fmt.Errorf("failed to parse existing sequel.yml: %w", err)
+		}
+	} else {
+		config = &SequelConfig{Sequels: make(map[string]DialectConfig)}
+	}
+
+	// * ensure postgres dialect exists
+	if config.Sequels == nil {
+		config.Sequels = make(map[string]DialectConfig)
+	}
+	if _, exists := config.Sequels["postgres"]; !exists {
+		config.Sequels["postgres"] = DialectConfig{Tables: make(map[string]TableConfig)}
+	}
+	postgresDialect := config.Sequels["postgres"]
+
+	// * add missing tables and fields
+	configUpdated := false
+	for _, table := range tables {
+		tableConfig, tableExists := postgresDialect.Tables[table.Name]
+		if !tableExists {
+			tableConfig = TableConfig{
+				Fields:    make(map[string]FieldConfig),
+				Additions: []AdditionConfig{},
+			}
+			postgresDialect.Tables[table.Name] = tableConfig
+			configUpdated = true
+		}
+
+		// * ensure fields map exists
+		if tableConfig.Fields == nil {
+			tableConfig.Fields = make(map[string]FieldConfig)
+		}
+
+		// * add missing fields with include: true
+		for _, column := range table.Columns {
+			if _, fieldExists := tableConfig.Fields[column.Name]; !fieldExists {
+				tableConfig.Fields[column.Name] = FieldConfig{Include: true}
+				configUpdated = true
+			}
+		}
+	}
+
+	// * write back config if updated
+	if configUpdated || !configExists {
+		configData, err := yaml.Marshal(config)
+		if err != nil {
+			return fmt.Errorf("failed to marshal sequel.yml: %w", err)
+		}
+
+		// * ensure directory exists
+		dir := filepath.Dir(configPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create config directory: %w", err)
+		}
+
+		if err := os.WriteFile(configPath, configData, 0644); err != nil {
+			return fmt.Errorf("failed to write sequel.yml: %w", err)
+		}
+
+		log.Printf("Updated sequel.yml with missing tables and fields")
+	}
+
+	return nil
 }

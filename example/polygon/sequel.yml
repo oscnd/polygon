@@ -1,0 +1,117 @@
+sequels:
+    postgres:
+        tables:
+            comment_reactions:
+                fields:
+                    comment_id:
+                        include: true
+                    created_at:
+                        include: true
+                    profile_id:
+                        include: true
+                    reaction_name:
+                        include: true
+                    updated_at:
+                        include: true
+                additions: []
+            comments:
+                fields:
+                    content:
+                        include: true
+                    created_at:
+                        include: true
+                    id:
+                        include: true
+                    parent_comment_id:
+                        include: true
+                    post_id:
+                        include: true
+                    profile_id:
+                        include: true
+                    updated_at:
+                        include: true
+                additions: []
+            follows:
+                fields:
+                    approved_at:
+                        include: true
+                    created_at:
+                        include: true
+                    followed_profile_id:
+                        include: true
+                    follower_profile_id:
+                        include: true
+                    updated_at:
+                        include: true
+                additions: []
+            medias:
+                fields:
+                    created_at:
+                        include: true
+                    id:
+                        include: true
+                    media_type:
+                        include: true
+                    ordering:
+                        include: true
+                    post_id:
+                        include: true
+                    updated_at:
+                        include: true
+                additions: []
+            post_reactions:
+                fields:
+                    created_at:
+                        include: true
+                    post_id:
+                        include: true
+                    profile_id:
+                        include: true
+                    reaction_name:
+                        include: true
+                    updated_at:
+                        include: true
+                additions: []
+            posts:
+                fields:
+                    caption:
+                        include: true
+                    created_at:
+                        include: true
+                    id:
+                        include: true
+                    profile_id:
+                        include: true
+                    updated_at:
+                        include: true
+                    visibility:
+                        include: true
+                additions: []
+            profiles:
+                fields:
+                    bio:
+                        include: true
+                    created_at:
+                        include: true
+                    display_name:
+                        include: true
+                    handle:
+                        include: true
+                    id:
+                        include: true
+                    is_public:
+                        include: true
+                    updated_at:
+                        include: true
+                    user_id:
+                        include: true
+                additions: []
+            users:
+                fields: {}
+                additions:
+                    - name: picture_url
+                      package: ""
+                      type: string
+                    - name: settings
+                      package: example/type/prop
+                      type: UserSettings
