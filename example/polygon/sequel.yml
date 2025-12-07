@@ -119,11 +119,11 @@ sequels:
                     metadata:
                         include: true
                     oid:
-                        include: true
+                        include: false
                     password_hash:
-                        include: true
+                        include: false
                     totp_secret:
-                        include: true
+                        include: false
                     updated_at:
                         include: true
                     username:

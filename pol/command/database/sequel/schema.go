@@ -148,38 +148,37 @@ func SchemaGenerate(app index.App, migrationDir, dirName, dialect string) error 
 		return fmt.Errorf("failed to write schema file: %w", err)
 	}
 
-	// * parse sqlc.yml for type overrides
-	sqlcConfigPath := filepath.Join("sqlc.yml")
+	// * parse sqlc configuration
 	var sqlcConfig config.Config
-
-	if configData, err := os.ReadFile(sqlcConfigPath); err == nil {
-		if parsedConfig, parseErr := config.ParseConfig(strings.NewReader(string(configData))); parseErr == nil {
-			sqlcConfig = parsedConfig
-		}
+	sqlcConfigPath := filepath.Join("sqlc.yml")
+	sqlcConfigFile, err := os.Open(sqlcConfigPath)
+	if err != nil {
+		log.Fatalf("no sqlc configuration")
+	}
+	if parsedConfig, parseErr := config.ParseConfig(sqlcConfigFile); parseErr == nil {
+		sqlcConfig = parsedConfig
 	}
 
-	// * parse sequel.yml for additions/contractions
-	sequelConfigPath := filepath.Join(*app.Directory(), "sequel.yml")
-	var sequelConfig *SequelConfig
-	configExists := true
-	if configData, err := os.ReadFile(sequelConfigPath); err == nil {
-		if err := yaml.Unmarshal(configData, &sequelConfig); err != nil {
+	// * parse sequel configuration
+	configPath := filepath.Join(*app.Directory(), "sequel.yml")
+	var conf *Config
+	if configData, err := os.ReadFile(configPath); err == nil {
+		if err := yaml.Unmarshal(configData, &conf); err != nil {
 			return fmt.Errorf("failed to parse sequel.yml: %w", err)
 		}
 	} else {
-		// * file not found is not fatal, create new config
-		sequelConfig = &SequelConfig{Sequels: make(map[string]DialectConfig)}
-		configExists = false
+		// * use empty config as fallback
+		conf = &Config{Sequels: make(map[string]*ConfigDialect)}
 	}
 
-	// * generate Go structs using sqlc catalog
-	err = Model(app, migrationFiles, dirName, dialect, sqlcConfig, sequelConfig)
+	// * generate go structs using sqlc catalog
+	err = Model(app, migrationFiles, dirName, dialect, sqlcConfig, conf)
 	if err != nil {
 		return fmt.Errorf("failed to generate Go structs: %w", err)
 	}
 
 	// * update sequel.yml with missing tables and fields
-	err = ModelUpdateSequelConfig(app, sequelConfigPath, tables, configExists)
+	err = ModelUpdateSequelConfig(app, configPath, conf, tables)
 	if err != nil {
 		return fmt.Errorf("failed to update sequel.yml: %w", err)
 	}

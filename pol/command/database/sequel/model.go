@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bsthun/gut"
 	"go.scnd.dev/polygon/external/sqlc/config"
 	"go.scnd.dev/polygon/external/sqlc/engine/postgresql"
 	"go.scnd.dev/polygon/external/sqlc/migrations"
@@ -16,30 +17,30 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type SequelConfig struct {
-	Sequels map[string]DialectConfig `yaml:"sequels"`
+type Config struct {
+	Sequels map[string]*ConfigDialect `yaml:"sequels"`
 }
 
-type DialectConfig struct {
-	Tables map[string]TableConfig `yaml:"tables"`
+type ConfigDialect struct {
+	Tables map[string]*ConfigTable `yaml:"tables"`
 }
 
-type TableConfig struct {
-	Fields    map[string]FieldConfig `yaml:"fields"`
-	Additions []AdditionConfig       `yaml:"additions"`
+type ConfigTable struct {
+	Fields    map[string]*ConfigField `yaml:"fields"`
+	Additions []*ConfigAddition       `yaml:"additions"`
 }
 
-type FieldConfig struct {
-	Include bool `yaml:"include"`
+type ConfigField struct {
+	Include *bool `yaml:"include"`
 }
 
-type AdditionConfig struct {
-	Name    string `yaml:"name"`
-	Package string `yaml:"package"`
-	Type    string `yaml:"type"`
+type ConfigAddition struct {
+	Name    *string `yaml:"name"`
+	Package *string `yaml:"package"`
+	Type    *string `yaml:"type"`
 }
 
-func Model(app index.App, migrationFiles []string, dirName, dialect string, sqlc config.Config, sequelConfig *SequelConfig) error {
+func Model(app index.App, migrationFiles []string, dirName, dialect string, sqlc config.Config, sequelConfig *Config) error {
 	// * create sqlc catalog
 	cat := catalog.New("public")
 
@@ -85,7 +86,7 @@ func Model(app index.App, migrationFiles []string, dirName, dialect string, sqlc
 	return nil
 }
 
-func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Table, sqlc config.Config, sequelConfig *SequelConfig) error {
+func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Table, sqlc config.Config, sequelConfig *Config) error {
 	// * construct model file paths using singular table name
 	singularTableName := util.ToSingular(table.Rel.Name)
 	generatedModelDir := filepath.Join("generate", "polygon", "model")
@@ -107,11 +108,11 @@ func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Tabl
 	}
 
 	// * get table config from sequel.yml
-	var tableConfig *TableConfig
+	var tableConfig *ConfigTable
 	if sequelConfig != nil && sequelConfig.Sequels != nil {
 		if dialectConfig, exists := sequelConfig.Sequels["postgres"]; exists {
 			if tc, exists := dialectConfig.Tables[table.Rel.Name]; exists {
-				tableConfig = &tc
+				tableConfig = tc
 			}
 		}
 	}
@@ -157,14 +158,14 @@ func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Tabl
 	// * generate struct name in title case (singular form)
 	structName := util.ToSingularTitleCase(table.Rel.Name)
 
-	// * generate main struct
-	mainStruct := ModelGenerateMainStruct(structName, table, &sqlc)
+	// * generate main struct using tableConfig
+	mainStruct := ModelGenerateMainStructWithConfig(structName, table, &sqlc, tableConfig)
 
 	// * generate addition/contraction structs from config
 	var additionStruct, contractionStruct string
 	if tableConfig != nil {
 		additionStruct = ModelGenerateAdditionStruct(structName, tableConfig.Additions)
-		contractionStruct = ModelGenerateContractionStruct(structName, tableConfig.Fields)
+		contractionStruct = ModelGenerateContractionStruct(structName, tableConfig.Fields, table, &sqlc)
 	} else {
 		// * default to empty structs if no config
 		additionStruct = fmt.Sprintf("type %sAddition struct {\n}\n", structName)
@@ -172,10 +173,10 @@ func ModelGenerate(table *catalog.Table, dirName string, tables map[string]*Tabl
 	}
 
 	// * generate ModelAdded struct using reflection
-	addedStruct := ModelGenerateAdded(structName, table, additionStruct, contractionStruct, &sqlc)
+	addedStruct := ModelGenerateAdded(structName, table, additionStruct, contractionStruct, &sqlc, tableConfig)
 
 	// * generate ModelAdded struct first to use as base for Joined/Parented
-	modelAddedBase := ModelGenerateAdded(structName, table, additionStruct, contractionStruct, &sqlc)
+	modelAddedBase := ModelGenerateAdded(structName, table, additionStruct, contractionStruct, &sqlc, tableConfig)
 
 	// * generate ModelJoined struct with references
 	joinedStruct := ModelGenerateJoined(structName, table, modelAddedBase, tables)
@@ -258,6 +259,41 @@ func ModelGenerateMainStruct(name string, table *catalog.Table, sqlcConfig *conf
 			builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToTitleCase(col.Name), goType, jsonTag))
 		} else {
 			builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", util.ToTitleCase(col.Name), goType, jsonTag))
+		}
+	}
+
+	builder.WriteString("}\n")
+	return builder.String()
+}
+
+func ModelGenerateMainStructWithConfig(name string, table *catalog.Table, sqlcConfig *config.Config, tableConfig *ConfigTable) string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("type %s struct {\n", name))
+
+	for _, col := range table.Columns {
+		// * check if field should be included based on config
+		shouldInclude := true
+		if tableConfig != nil && tableConfig.Fields != nil {
+			if fieldConfig, exists := tableConfig.Fields[col.Name]; exists {
+				if fieldConfig.Include != nil {
+					shouldInclude = *fieldConfig.Include
+				}
+			}
+		}
+
+		if shouldInclude {
+			// * convert SQL type to Go type
+			goType := ModelSqlTypeToGoType(col.Type.Name, col.IsNotNull, col.Name, table.Rel.Name, sqlcConfig)
+
+			// * generate json tag
+			jsonTag := util.ToCamelCase(col.Name)
+
+			// * generate field
+			if col.IsNotNull {
+				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToTitleCase(col.Name), goType, jsonTag))
+			} else {
+				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", util.ToTitleCase(col.Name), goType, jsonTag))
+			}
 		}
 	}
 
@@ -371,7 +407,7 @@ func ModelGetOrCreateStruct(existingStructs map[string]string, name string, crea
 	return ""
 }
 
-func ModelGenerateAdded(baseName string, table *catalog.Table, additionStruct, contractionStruct string, sqlcConfig *config.Config) string {
+func ModelGenerateAdded(baseName string, table *catalog.Table, additionStruct, contractionStruct string, sqlcConfig *config.Config, tableConfig *ConfigTable) string {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("type %sAdded struct {\n", baseName))
 
@@ -379,14 +415,26 @@ func ModelGenerateAdded(baseName string, table *catalog.Table, additionStruct, c
 	additionFields := ModelParseStructFields(additionStruct)
 	contractionFields := ModelParseStructFields(contractionStruct)
 
-	// * add main struct fields
+	// * add main struct fields filtered by tableConfig
 	for _, col := range table.Columns {
-		goType := ModelSqlTypeToGoType(col.Type.Name, col.IsNotNull, col.Name, table.Rel.Name, sqlcConfig)
-		jsonTag := util.ToCamelCase(col.Name)
-		if col.IsNotNull {
-			builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToTitleCase(col.Name), goType, jsonTag))
-		} else {
-			builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", util.ToTitleCase(col.Name), goType, jsonTag))
+		// * check if field should be included based on config
+		shouldInclude := true
+		if tableConfig != nil && tableConfig.Fields != nil {
+			if fieldConfig, exists := tableConfig.Fields[col.Name]; exists {
+				if fieldConfig.Include != nil {
+					shouldInclude = *fieldConfig.Include
+				}
+			}
+		}
+
+		if shouldInclude {
+			goType := ModelSqlTypeToGoType(col.Type.Name, col.IsNotNull, col.Name, table.Rel.Name, sqlcConfig)
+			jsonTag := util.ToCamelCase(col.Name)
+			if col.IsNotNull {
+				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToTitleCase(col.Name), goType, jsonTag))
+			} else {
+				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", util.ToTitleCase(col.Name), goType, jsonTag))
+			}
 		}
 	}
 
@@ -694,9 +742,9 @@ func ModelGenerateFileContent(orderedStructs []string, requiredImports []string)
 	return builder.String()
 }
 
-func ModelValidateFields(tableConfig *TableConfig, table *catalog.Table) error {
+func ModelValidateFields(tableConfig *ConfigTable, table *catalog.Table) error {
 	for fieldName, fieldConfig := range tableConfig.Fields {
-		if fieldConfig.Include {
+		if fieldConfig.Include != nil && *fieldConfig.Include {
 			// * check if field exists in database schema
 			found := false
 			for _, col := range table.Columns {
@@ -713,19 +761,21 @@ func ModelValidateFields(tableConfig *TableConfig, table *catalog.Table) error {
 	return nil
 }
 
-func ModelValidateAdditions(additions []AdditionConfig, table *catalog.Table) error {
+func ModelValidateAdditions(additions []*ConfigAddition, table *catalog.Table) error {
 	for _, addition := range additions {
-		// * check if addition conflicts with existing columns
-		for _, col := range table.Columns {
-			if col.Name == addition.Name {
-				return fmt.Errorf("addition '%s' conflicts with existing column in table '%s'", addition.Name, table.Rel.Name)
+		if addition.Name != nil {
+			// * check if addition conflicts with existing columns
+			for _, col := range table.Columns {
+				if col.Name == *addition.Name {
+					return fmt.Errorf("addition '%s' conflicts with existing column in table '%s'", *addition.Name, table.Rel.Name)
+				}
 			}
 		}
 	}
 	return nil
 }
 
-func ModelGenerateAdditionStruct(structName string, additions []AdditionConfig) string {
+func ModelGenerateAdditionStruct(structName string, additions []*ConfigAddition) string {
 	if len(additions) == 0 {
 		return fmt.Sprintf("type %sAddition struct {\n}\n", structName)
 	}
@@ -734,20 +784,22 @@ func ModelGenerateAdditionStruct(structName string, additions []AdditionConfig) 
 	builder.WriteString(fmt.Sprintf("type %sAddition struct {\n", structName))
 
 	for _, addition := range additions {
-		fieldType := ModelConvertAdditionType(addition)
-		builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n",
-			util.ToTitleCase(addition.Name), fieldType, util.ToCamelCase(addition.Name)))
+		if addition.Name != nil {
+			fieldType := ModelConvertAdditionType(addition)
+			builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n",
+				util.ToTitleCase(*addition.Name), fieldType, util.ToCamelCase(*addition.Name)))
+		}
 	}
 
 	builder.WriteString("}\n")
 	return builder.String()
 }
 
-func ModelGenerateContractionStruct(structName string, fields map[string]FieldConfig) string {
+func ModelGenerateContractionStruct(structName string, fields map[string]*ConfigField, table *catalog.Table, sqlcConfig *config.Config) string {
 	// * find excluded fields (include: false)
 	var excludedFields []string
 	for fieldName, fieldConfig := range fields {
-		if !fieldConfig.Include {
+		if fieldConfig.Include != nil && !*fieldConfig.Include {
 			excludedFields = append(excludedFields, fieldName)
 		}
 	}
@@ -756,111 +808,115 @@ func ModelGenerateContractionStruct(structName string, fields map[string]FieldCo
 		return fmt.Sprintf("type %sContraction struct {\n}\n", structName)
 	}
 
-	// * generate struct with excluded fields only
+	// * generate struct with excluded fields only, using original types
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("type %sContraction struct {\n", structName))
+
 	for _, field := range excludedFields {
-		builder.WriteString(fmt.Sprintf("    %s any `json:\"%s\"`\n",
-			util.ToTitleCase(field), util.ToCamelCase(field)))
+		// * find the column to get original type
+		var goType = "any"
+		for _, col := range table.Columns {
+			if col.Name == field {
+				goType = ModelSqlTypeToGoType(col.Type.Name, col.IsNotNull, col.Name, table.Rel.Name, sqlcConfig)
+				break
+			}
+		}
+		builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n",
+			util.ToTitleCase(field), goType, util.ToCamelCase(field)))
 	}
 	builder.WriteString("}\n")
 	return builder.String()
 }
 
-func ModelConvertAdditionType(addition AdditionConfig) string {
+func ModelConvertAdditionType(addition *ConfigAddition) string {
 	// * if package specified, use qualified type name
-	if addition.Package != "" {
+	if addition.Package != nil && *addition.Package != "" {
 		// * extract package name from path
-		pathParts := strings.Split(addition.Package, "/")
+		pathParts := strings.Split(*addition.Package, "/")
 		packageName := pathParts[len(pathParts)-1]
-		return "*" + packageName + "." + addition.Type
+		return "*" + packageName + "." + *addition.Type
 	}
 
 	// * default to pointer type
-	switch strings.ToLower(addition.Type) {
-	case "string":
-		return "*string"
-	case "int", "int64":
-		return "*int64"
-	case "uint64":
-		return "*uint64"
-	case "bool":
-		return "*bool"
-	case "time", "timestamp":
-		return "*time.Time"
-	default:
-		return "*" + addition.Type
+	if addition.Type != nil {
+		switch strings.ToLower(*addition.Type) {
+		case "string":
+			return "*string"
+		case "int", "int64":
+			return "*int64"
+		case "uint64":
+			return "*uint64"
+		case "bool":
+			return "*bool"
+		case "time", "timestamp":
+			return "*time.Time"
+		default:
+			return "*" + *addition.Type
+		}
 	}
+
+	return "*string"
 }
 
-func ModelExtractAdditionImports(additions []AdditionConfig) []string {
+func ModelExtractAdditionImports(additions []*ConfigAddition) []string {
 	var imports []string
 	seen := make(map[string]bool)
 
 	for _, addition := range additions {
-		if addition.Package != "" && !seen[addition.Package] {
-			imports = append(imports, addition.Package)
-			seen[addition.Package] = true
+		if addition.Package != nil && *addition.Package != "" && !seen[*addition.Package] {
+			imports = append(imports, *addition.Package)
+			seen[*addition.Package] = true
 		}
 	}
 
 	return imports
 }
 
-func ModelUpdateSequelConfig(app index.App, configPath string, tables map[string]*Table, configExists bool) error {
-	var config *SequelConfig
-
-	// * read existing config or create new one
-	if configExists {
-		configData, err := os.ReadFile(configPath)
-		if err != nil {
-			return fmt.Errorf("failed to read existing sequel.yml: %w", err)
-		}
-		if err := yaml.Unmarshal(configData, &config); err != nil {
-			return fmt.Errorf("failed to parse existing sequel.yml: %w", err)
-		}
-	} else {
-		config = &SequelConfig{Sequels: make(map[string]DialectConfig)}
-	}
+func ModelUpdateSequelConfig(app index.App, configPath string, config *Config, tables map[string]*Table) error {
+	// * construct update status
+	updated := false
 
 	// * ensure postgres dialect exists
 	if config.Sequels == nil {
-		config.Sequels = make(map[string]DialectConfig)
+		config.Sequels = make(map[string]*ConfigDialect)
+		updated = true
 	}
 	if _, exists := config.Sequels["postgres"]; !exists {
-		config.Sequels["postgres"] = DialectConfig{Tables: make(map[string]TableConfig)}
+		config.Sequels["postgres"] = &ConfigDialect{Tables: make(map[string]*ConfigTable)}
+		updated = true
 	}
 	postgresDialect := config.Sequels["postgres"]
 
 	// * add missing tables and fields
-	configUpdated := false
 	for _, table := range tables {
 		tableConfig, tableExists := postgresDialect.Tables[table.Name]
 		if !tableExists {
-			tableConfig = TableConfig{
-				Fields:    make(map[string]FieldConfig),
-				Additions: []AdditionConfig{},
+			tableConfig = &ConfigTable{
+				Fields:    make(map[string]*ConfigField),
+				Additions: []*ConfigAddition{},
 			}
 			postgresDialect.Tables[table.Name] = tableConfig
-			configUpdated = true
+			updated = true
 		}
 
 		// * ensure fields map exists
 		if tableConfig.Fields == nil {
-			tableConfig.Fields = make(map[string]FieldConfig)
+			tableConfig.Fields = make(map[string]*ConfigField)
 		}
 
 		// * add missing fields with include: true
 		for _, column := range table.Columns {
 			if _, fieldExists := tableConfig.Fields[column.Name]; !fieldExists {
-				tableConfig.Fields[column.Name] = FieldConfig{Include: true}
-				configUpdated = true
+				tableConfig.Fields[column.Name] = &ConfigField{
+					Include: gut.Ptr(true),
+				}
+				updated = true
 			}
 		}
 	}
 
 	// * write back config if updated
-	if configUpdated || !configExists {
+	if updated {
 		configData, err := yaml.Marshal(config)
 		if err != nil {
 			return fmt.Errorf("failed to marshal sequel.yml: %w", err)
