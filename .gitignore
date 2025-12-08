@@ -7,6 +7,9 @@
 
 # local
 .local
+generate/
+/external/*
+!/external/go.*
 
 # operating system
 .DS_Store
