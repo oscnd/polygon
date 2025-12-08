@@ -1,6 +1,6 @@
 connections:
     postgres:
-        dialect: null
+        dialect: postgres
         tables:
             comment_reactions:
                 fields:
@@ -122,16 +122,16 @@ connections:
                     oid:
                         include: base
                     password_hash:
-                        include: base
+                        include: none
                     totp_secret:
-                        include: base
+                        include: none
                     updated_at:
                         include: base
                     username:
                         include: base
                 additions:
                     - name: picture_url
-                      package: ""
+                      package: null
                       type: string
                     - name: settings
                       package: example/type/prop

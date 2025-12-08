@@ -16,7 +16,7 @@ func Schema(app index.App) error {
 
 	// * 2. process each directory for summary and models
 	for dirName := range parser.Connections {
-		log.Printf("Processing schema and models for %s...", dirName)
+		log.Printf("processing schema and models for %s...", dirName)
 
 		// * call Summary for each directory
 		if err := Summary(parser, dirName); err != nil {
@@ -30,7 +30,7 @@ func Schema(app index.App) error {
 			continue
 		}
 
-		log.Printf("Generated schema and models for %s", dirName)
+		log.Printf("generated schema and models for %s", dirName)
 	}
 
 	return nil

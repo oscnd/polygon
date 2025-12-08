@@ -74,7 +74,7 @@ func ModelGenerate(tableName string, table *Table, parser *Parser, dirName strin
 	// * get table config from sequel.yml
 	var tableConfig *ConfigTable
 	if parser.Config != nil && parser.Config.Connections != nil {
-		if dialectConfig, exists := parser.Config.Connections["postgres"]; exists {
+		if dialectConfig, exists := parser.Config.Connections[dirName]; exists {
 			if tc, exists := dialectConfig.Tables[tableName]; exists {
 				tableConfig = tc
 			}

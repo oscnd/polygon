@@ -62,7 +62,7 @@ func NewParser(app index.App) (*Parser, error) {
 		}
 
 		// * parse migrations for this directory into connection
-		if err := r.ParseConnection(dirName, migrationDir, connection); err != nil {
+		if err := r.ParseConnection(connection, migrationDir); err != nil {
 			log.Printf("Warning: failed to parse directory %s: %v", dirName, err)
 			continue
 		}
@@ -84,7 +84,7 @@ func NewParser(app index.App) (*Parser, error) {
 	return r, nil
 }
 
-func (r *Parser) ParseConnection(dirName, migrationDir string, connection *Connection) error {
+func (r *Parser) ParseConnection(connection *Connection, migrationDir string) error {
 	// * find all sql files in migration directory
 	entries, err := os.ReadDir(migrationDir)
 	if err != nil {
@@ -167,28 +167,33 @@ func (r *Parser) ParseConfig() error {
 }
 
 func (r *Parser) ReviseConfig() error {
+	// * construct updated status
+	updated := false
+
 	// * ensure sequel config structure exists
 	if r.Config == nil {
 		r.Config = &Config{Connections: make(map[string]*ConfigConnection)}
+		updated = true
 	}
 
 	if r.Config.Connections == nil {
 		r.Config.Connections = make(map[string]*ConfigConnection)
+		updated = true
 	}
 
 	// * ensure each connection has a dialect
 	for _, connection := range r.Config.Connections {
 		if connection.Dialect == nil {
 			connection.Dialect = gut.Ptr("postgres")
+			updated = true
 		}
-		// ensure tables map exists
 		if connection.Tables == nil {
 			connection.Tables = make(map[string]*ConfigTable)
+			updated = true
 		}
 	}
 
 	// * add missing tables and fields from connections
-	updated := false
 	for connName, connection := range r.Connections {
 		// * find or create config for this connection
 		connectionConfig, exists := r.Config.Connections[connName]
@@ -318,7 +323,7 @@ func (r *Parser) GenerateStruct(name string, table *Table, tableConfig *ConfigTa
 
 		if shouldInclude {
 			// * convert SQL type to Go type
-			goType := r.SqlToGoType(*col.Type, !*col.Nullable, *col.Name, "")
+			goType := r.SqlToGoType(*col.Type, !*col.Nullable, *col.Name, *table.Name)
 
 			// * generate json tag
 			jsonTag := util.ToCamelCase(*col.Name)
@@ -408,7 +413,7 @@ func (r *Parser) GenerateAdded(baseName string, table *Table, additionStruct, co
 		}
 
 		if shouldInclude {
-			goType := r.SqlToGoType(*col.Type, !*col.Nullable, *col.Name, "")
+			goType := r.SqlToGoType(*col.Type, !*col.Nullable, *col.Name, *table.Name)
 			jsonTag := util.ToCamelCase(*col.Name)
 			if !*col.Nullable {
 				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToTitleCase(*col.Name), goType, jsonTag))
@@ -614,15 +619,14 @@ func (r *Parser) SqlToGoType(sqlType string, notNull bool, columnName string, ta
 									if overrideTable == tableName && overrideColumn == columnName {
 										// * found matching override, construct type from override
 										goType := ""
-										if override.GoType.Package != "" && override.GoType.Path != "" {
-											// * imported type
-											if override.GoType.Package != "" {
-												goType = override.GoType.Package + "." + override.GoType.Name
-											} else {
-												pathParts := strings.Split(override.GoType.Path, "/")
-												packageName := pathParts[len(pathParts)-1]
-												goType = packageName + "." + override.GoType.Name
-											}
+										if override.GoType.Path != "" {
+											// * imported type with path
+											pathParts := strings.Split(override.GoType.Path, "/")
+											packageName := pathParts[len(pathParts)-1]
+											goType = packageName + "." + override.GoType.Name
+										} else if override.GoType.Package != "" {
+											// * imported type with package name
+											goType = override.GoType.Package + "." + override.GoType.Name
 										} else {
 											// * built-in type
 											goType = override.GoType.Name
