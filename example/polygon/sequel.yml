@@ -1,133 +1,134 @@
-sequels:
+connections:
     postgres:
+        dialect: null
         tables:
             comment_reactions:
                 fields:
                     comment_id:
-                        include: true
+                        include: base
                     created_at:
-                        include: true
+                        include: base
                     profile_id:
-                        include: true
+                        include: base
                     reaction_name:
-                        include: true
+                        include: base
                     updated_at:
-                        include: true
+                        include: base
                 additions: []
             comments:
                 fields:
                     content:
-                        include: true
+                        include: base
                     created_at:
-                        include: true
+                        include: base
                     id:
-                        include: true
+                        include: base
                     parent_comment_id:
-                        include: true
+                        include: base
                     post_id:
-                        include: true
+                        include: base
                     profile_id:
-                        include: true
+                        include: base
                     updated_at:
-                        include: true
+                        include: base
                 additions: []
             follows:
                 fields:
                     approved_at:
-                        include: true
+                        include: base
                     created_at:
-                        include: true
+                        include: base
                     followed_profile_id:
-                        include: true
+                        include: base
                     follower_profile_id:
-                        include: true
+                        include: base
                     updated_at:
-                        include: true
+                        include: base
                 additions: []
             medias:
                 fields:
                     created_at:
-                        include: true
+                        include: base
                     id:
-                        include: true
+                        include: base
                     media_type:
-                        include: true
+                        include: base
                     ordering:
-                        include: true
+                        include: base
                     post_id:
-                        include: true
+                        include: base
                     updated_at:
-                        include: true
+                        include: base
                 additions: []
             post_reactions:
                 fields:
                     created_at:
-                        include: true
+                        include: base
                     post_id:
-                        include: true
+                        include: base
                     profile_id:
-                        include: true
+                        include: base
                     reaction_name:
-                        include: true
+                        include: base
                     updated_at:
-                        include: true
+                        include: base
                 additions: []
             posts:
                 fields:
                     caption:
-                        include: true
+                        include: base
                     created_at:
-                        include: true
+                        include: base
                     id:
-                        include: true
+                        include: base
                     profile_id:
-                        include: true
+                        include: base
                     updated_at:
-                        include: true
+                        include: base
                     visibility:
-                        include: true
+                        include: base
                 additions: []
             profiles:
                 fields:
                     bio:
-                        include: true
+                        include: base
                     created_at:
-                        include: true
+                        include: base
                     display_name:
-                        include: true
+                        include: base
                     handle:
-                        include: true
+                        include: base
                     id:
-                        include: true
+                        include: base
                     is_public:
-                        include: true
+                        include: base
                     updated_at:
-                        include: true
+                        include: base
                     user_id:
-                        include: true
+                        include: base
                 additions: []
             users:
                 fields:
                     created_at:
-                        include: true
+                        include: base
                     email:
-                        include: true
+                        include: base
                     id:
-                        include: true
+                        include: base
                     is_active:
-                        include: true
+                        include: base
                     metadata:
-                        include: true
+                        include: base
                     oid:
-                        include: false
+                        include: base
                     password_hash:
-                        include: false
+                        include: base
                     totp_secret:
-                        include: false
+                        include: base
                     updated_at:
-                        include: true
+                        include: base
                     username:
-                        include: true
+                        include: base
                 additions:
                     - name: picture_url
                       package: ""

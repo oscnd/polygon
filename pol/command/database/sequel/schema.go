@@ -3,184 +3,34 @@ package sequel
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
-	"go.scnd.dev/polygon/external/sqlc/config"
-	"go.scnd.dev/polygon/external/sqlc/migrations"
 	"go.scnd.dev/polygon/pol/index"
-	"gopkg.in/yaml.v3"
 )
 
 func Schema(app index.App) error {
-	// * find all directories
-	sequelDir := filepath.Join("sequel")
-	entries, err := os.ReadDir(sequelDir)
+	// * 1. new parser (once)
+	parser, err := NewParser(app)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("sequel directory not found: %s", sequelDir)
-		}
-		return fmt.Errorf("failed to read sequel directory: %w", err)
+		return fmt.Errorf("error creating parser: %w", err)
 	}
 
-	// * process each sequel directory
-	for _, entry := range entries {
-		if !entry.IsDir() {
+	// * 2. process each directory for summary and models
+	for dirName := range parser.Connections {
+		log.Printf("Processing schema and models for %s...", dirName)
+
+		// * call Summary for each directory
+		if err := Summary(parser, dirName); err != nil {
+			log.Printf("Error generating summary for %s: %v", dirName, err)
 			continue
 		}
 
-		dirName := entry.Name()
-		migrationDir := filepath.Join(sequelDir, dirName, "migration")
-
-		// * check if migration directory exists
-		if _, err := os.Stat(migrationDir); os.IsNotExist(err) {
-			log.Printf("Skipping %s: no migration directory found", dirName)
+		// * call Model for each directory
+		if err := Model(parser, dirName); err != nil {
+			log.Printf("Error generating models for %s: %v", dirName, err)
 			continue
 		}
 
-		log.Printf("Processing schema for %s...", dirName)
-
-		// * generate schema for this directory
-		// TODO: support multiple dialects
-		err := SchemaGenerate(app, migrationDir, dirName, "postgres")
-		if err != nil {
-			log.Printf("Error generating schema for %s: %v", dirName, err)
-			continue
-		}
-
-		log.Printf("Generated schema for %s", dirName)
-	}
-
-	return nil
-}
-
-func SchemaGenerate(app index.App, migrationDir, dirName, dialect string) error {
-	// * find all sql files in migration directory
-	migrationFiles := make([]string, 0)
-	entries, err := os.ReadDir(migrationDir)
-	if err != nil {
-		return fmt.Errorf("failed to read migration directory: %w", err)
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".sql") {
-			continue
-		}
-		if strings.HasPrefix(name, ".") {
-			continue
-		}
-		if migrations.IsDown(name) {
-			continue
-		}
-		migrationFiles = append(migrationFiles, filepath.Join(migrationDir, name))
-	}
-	if len(migrationFiles) == 0 {
-		return fmt.Errorf("no migration files found in %s", migrationDir)
-	}
-
-	// * sort files for consistent order
-	sort.Strings(migrationFiles)
-
-	// * parse migrations and build schema state
-	tables := make(map[string]*Table)
-	functions := make(map[string]*Function)
-	triggers := make(map[string]*Trigger)
-
-	for _, file := range migrationFiles {
-		content, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("failed to read file %s: %w", file, err)
-		}
-
-		// * remove rollback statements
-		cleanContent := migrations.RemoveRollbackStatements(string(content))
-
-		// * parse cleaned migration
-		ParseMigration(cleanContent, tables, functions, triggers)
-	}
-
-	// * generate final schema content
-	var schemaContent strings.Builder
-	schemaContent.WriteString("-- POLYGON GENERATED\n")
-	schemaContent.WriteString("-- database schema: ")
-	schemaContent.WriteString(dirName)
-	schemaContent.WriteString("\n-- dialect: ")
-	schemaContent.WriteString(dialect)
-	schemaContent.WriteString("\n\n")
-
-	// * write create table statements
-	for _, tableName := range SortedTableKeys(tables) {
-		table := tables[tableName]
-		schemaContent.WriteString(table.GenerateStatement())
-		schemaContent.WriteString("\n\n")
-	}
-
-	// * write create function statements
-	for _, funcName := range SortedFunctionKeys(functions) {
-		function := functions[funcName]
-		schemaContent.WriteString(function.GenerateStatement())
-		schemaContent.WriteString("\n\n")
-	}
-
-	// * write create trigger statements
-	for _, triggerName := range SortedTriggerKeys(triggers) {
-		trigger := triggers[triggerName]
-		schemaContent.WriteString(trigger.GenerateStatement())
-		schemaContent.WriteString("\n\n")
-	}
-
-	// * construct schema file path
-	schemaDir := filepath.Join("generate", "polygon", "sequel")
-	schemaFile := filepath.Join(schemaDir, fmt.Sprintf("%s.sql", dirName))
-
-	// * ensure directory
-	if err := os.MkdirAll(schemaDir, 0755); err != nil {
-		return fmt.Errorf("failed to create schema directory: %w", err)
-	}
-
-	err = os.WriteFile(schemaFile, []byte(schemaContent.String()), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write schema file: %w", err)
-	}
-
-	// * parse sqlc configuration
-	var sqlcConfig config.Config
-	sqlcConfigPath := filepath.Join("sqlc.yml")
-	sqlcConfigFile, err := os.Open(sqlcConfigPath)
-	if err != nil {
-		log.Fatalf("no sqlc configuration")
-	}
-	if parsedConfig, parseErr := config.ParseConfig(sqlcConfigFile); parseErr == nil {
-		sqlcConfig = parsedConfig
-	}
-
-	// * parse sequel configuration
-	configPath := filepath.Join(*app.Directory(), "sequel.yml")
-	var conf *Config
-	if configData, err := os.ReadFile(configPath); err == nil {
-		if err := yaml.Unmarshal(configData, &conf); err != nil {
-			return fmt.Errorf("failed to parse sequel.yml: %w", err)
-		}
-	} else {
-		// * use empty config as fallback
-		conf = &Config{Sequels: make(map[string]*ConfigDialect)}
-	}
-
-	// * generate go structs using sqlc catalog
-	err = Model(app, migrationFiles, dirName, dialect, sqlcConfig, conf)
-	if err != nil {
-		return fmt.Errorf("failed to generate Go structs: %w", err)
-	}
-
-	// * update sequel.yml with missing tables and fields
-	err = ModelUpdateSequelConfig(app, configPath, conf, tables)
-	if err != nil {
-		return fmt.Errorf("failed to update sequel.yml: %w", err)
+		log.Printf("Generated schema and models for %s", dirName)
 	}
 
 	return nil

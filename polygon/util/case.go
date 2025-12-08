@@ -20,19 +20,40 @@ func ToTitleCase(s string) string {
 }
 
 func ToCamelCase(s string) string {
-	// * convert snake case to camel case
-	parts := strings.Split(s, "_")
-	caser := cases.Title(language.English)
-	for i, part := range parts {
-		if part != "" {
-			if i == 0 {
-				parts[i] = strings.ToLower(part)
-			} else {
-				parts[i] = caser.String(strings.ToLower(part))
+	// * if string contains underscores, treat as snake case
+	if strings.Contains(s, "_") {
+		parts := strings.Split(s, "_")
+		caser := cases.Title(language.English)
+		for i, part := range parts {
+			if part != "" {
+				if i == 0 {
+					parts[i] = strings.ToLower(part)
+				} else {
+					parts[i] = caser.String(strings.ToLower(part))
+				}
 			}
 		}
+		return strings.Join(parts, "")
 	}
-	return strings.Join(parts, "")
+
+	// * check if string is already camelCase or PascalCase
+	if s == "" {
+		return s
+	}
+
+	// * check if all characters are lowercase (already camelCase)
+	if s == strings.ToLower(s) {
+		return s
+	}
+
+	// * check if all characters are uppercase
+	if s == strings.ToUpper(s) {
+		return strings.ToLower(s)
+	}
+
+	// * treat as PascalCase or mixed case - convert to camelCase
+	// * keep first character lowercase, preserve rest
+	return strings.ToLower(s[:1]) + s[1:]
 }
 
 func ToSingularTitleCase(s string) string {

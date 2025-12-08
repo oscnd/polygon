@@ -1,6 +1,11 @@
 package sequel
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/bsthun/gut"
+)
 
 func ParseMigration(content string, tables map[string]*Table, functions map[string]*Function, triggers map[string]*Trigger) {
 	lines := strings.Split(content, "\n")
@@ -17,7 +22,7 @@ func ParseMigration(content string, tables map[string]*Table, functions map[stri
 		if strings.HasPrefix(strings.ToUpper(line), "CREATE TABLE") {
 			table := ParseCreateTable(lines, &i)
 			if table != nil {
-				tables[table.Name] = table
+				tables[*table.Name] = table
 			}
 			continue
 		}
@@ -26,7 +31,7 @@ func ParseMigration(content string, tables map[string]*Table, functions map[stri
 		if strings.HasPrefix(strings.ToUpper(line), "CREATE FUNCTION") {
 			function := ParseCreateFunction(lines, &i)
 			if function != nil {
-				functions[function.Name] = function
+				functions[*function.Name] = function
 			}
 			continue
 		}
@@ -35,7 +40,7 @@ func ParseMigration(content string, tables map[string]*Table, functions map[stri
 		if strings.HasPrefix(strings.ToUpper(line), "CREATE TRIGGER") {
 			trigger := ParseCreateTrigger(lines, &i)
 			if trigger != nil {
-				triggers[trigger.Name] = trigger
+				triggers[*trigger.Name] = trigger
 			}
 			continue
 		}
@@ -59,7 +64,10 @@ func ParseCreateTable(lines []string, index *int) *Table {
 
 	tableName := strings.Trim(parts[2], `";`)
 	table := &Table{
-		Name: tableName,
+		Name:        &tableName,
+		Columns:     nil,
+		Indexes:     nil,
+		Constraints: nil,
 	}
 
 	// * parse table definition
@@ -128,7 +136,7 @@ func ParseTableDefinition(definition string, table *Table) {
 		if strings.HasPrefix(upperItem, "PRIMARY KEY") {
 			// * extract columns for primary key
 			constraint := &Constraint{
-				Type: "PRIMARY KEY",
+				Type: gut.Ptr("PRIMARY KEY"),
 			}
 			// * parse columns from `PRIMARY KEY`
 			startParen := strings.Index(item, "(")
@@ -137,8 +145,9 @@ func ParseTableDefinition(definition string, table *Table) {
 				columnsStr := strings.TrimSpace(item[startParen+1 : endParen])
 				if columnsStr != "" {
 					columns := strings.Split(columnsStr, ",")
-					for _, col := range columns {
-						constraint.Columns = append(constraint.Columns, strings.TrimSpace(col))
+					for _, column := range columns {
+						column = strings.TrimSpace(column)
+						constraint.Columns = append(constraint.Columns, &column)
 					}
 				}
 			}
@@ -149,7 +158,7 @@ func ParseTableDefinition(definition string, table *Table) {
 		if strings.HasPrefix(upperItem, "FOREIGN KEY") {
 			// * parse foreign key constraint
 			constraint := &Constraint{
-				Type: "FOREIGN KEY",
+				Type: gut.Ptr("FOREIGN KEY"),
 			}
 			// * extract columns from `FOREIGN KEY`
 			startParen := strings.Index(item, "(")
@@ -157,8 +166,9 @@ func ParseTableDefinition(definition string, table *Table) {
 			if startParen != -1 && endParen != -1 {
 				columnsStr := strings.TrimSpace(item[startParen+1 : endParen])
 				columns := strings.Split(columnsStr, ",")
-				for _, col := range columns {
-					constraint.Columns = append(constraint.Columns, strings.TrimSpace(col))
+				for _, column := range columns {
+					column = strings.TrimSpace(column)
+					constraint.Columns = append(constraint.Columns, &column)
 				}
 			}
 			// * extract referenced table
@@ -171,14 +181,14 @@ func ParseTableDefinition(definition string, table *Table) {
 					endRefParen := strings.Index(refPart[refParenIndex:], ")")
 					if endRefParen != -1 {
 						columnName := strings.TrimSpace(refPart[refParenIndex+1 : refParenIndex+endRefParen])
-						constraint.References = tableName + " (" + columnName + ")"
+						constraint.References = gut.Ptr(fmt.Sprintf("%s (%s)", tableName, columnName))
 					} else {
-						constraint.References = tableName
+						constraint.References = &tableName
 					}
 				} else {
 					refParts := strings.Fields(refPart)
 					if len(refParts) > 0 {
-						constraint.References = refParts[0]
+						constraint.References = &refParts[0]
 					}
 				}
 			}
@@ -189,7 +199,7 @@ func ParseTableDefinition(definition string, table *Table) {
 		if strings.HasPrefix(upperItem, "UNIQUE") {
 			// * parse unique constraint
 			constraint := &Constraint{
-				Type: "UNIQUE",
+				Type: gut.Ptr("UNIQUE"),
 			}
 			// * extract columns from `UNIQUE`
 			startParen := strings.Index(item, "(")
@@ -197,8 +207,9 @@ func ParseTableDefinition(definition string, table *Table) {
 			if startParen != -1 && endParen != -1 {
 				columnsStr := strings.TrimSpace(item[startParen+1 : endParen])
 				columns := strings.Split(columnsStr, ",")
-				for _, col := range columns {
-					constraint.Columns = append(constraint.Columns, strings.TrimSpace(col))
+				for _, column := range columns {
+					column = strings.TrimSpace(column)
+					constraint.Columns = append(constraint.Columns, &column)
 				}
 			}
 			table.Constraints = append(table.Constraints, constraint)
@@ -209,12 +220,12 @@ func ParseTableDefinition(definition string, table *Table) {
 			// * parse named constraint
 			if pkeyIndex := strings.Index(strings.ToUpper(item), "PRIMARY KEY"); pkeyIndex != -1 {
 				constraint := &Constraint{
-					Type: "PRIMARY KEY",
+					Type: gut.Ptr("PRIMARY KEY"),
 				}
 				// * extract constraint name
 				parts := strings.Fields(item)
 				if len(parts) > 1 {
-					constraint.Name = strings.Trim(parts[1], `"`)
+					constraint.Name = gut.Ptr(strings.Trim(parts[1], `"`))
 				}
 				// * extract columns
 				startParen := strings.Index(item, "(")
@@ -222,8 +233,9 @@ func ParseTableDefinition(definition string, table *Table) {
 				if startParen != -1 && endParen != -1 {
 					columnsStr := strings.TrimSpace(item[startParen+1 : endParen])
 					columns := strings.Split(columnsStr, ",")
-					for _, col := range columns {
-						constraint.Columns = append(constraint.Columns, strings.TrimSpace(col))
+					for _, column := range columns {
+						column = strings.TrimSpace(column)
+						constraint.Columns = append(constraint.Columns, &column)
 					}
 				}
 				table.Constraints = append(table.Constraints, constraint)
@@ -235,43 +247,49 @@ func ParseTableDefinition(definition string, table *Table) {
 		parts := strings.Fields(item)
 		if len(parts) >= 2 {
 			column := &Column{
-				Name:     strings.Trim(parts[0], `";`),
-				Type:     parts[1],
-				Nullable: true,
+				Name:     gut.Ptr(strings.Trim(parts[0], `";`)),
+				Type:     gut.Ptr(parts[1]),
+				Nullable: gut.Ptr(true),
 			}
 
 			// * parse column attributes
 			for j := 2; j < len(parts); j++ {
 				attr := strings.ToUpper(parts[j])
 				if attr == "NOT" && j+1 < len(parts) && strings.ToUpper(parts[j+1]) == "NULL" {
-					column.Nullable = false
+					column.Nullable = gut.Ptr(false)
 					j++
 				} else if attr == "DEFAULT" && j+1 < len(parts) {
-					column.Default = parts[j+1]
+					column.Default = gut.Ptr(parts[j+1])
 					j++
 				} else if attr == "PRIMARY" && j+1 < len(parts) && strings.ToUpper(parts[j+1]) == "KEY" {
 					// * handle inline `PRIMARY KEY`
-					column.Nullable = false
+					column.Nullable = gut.Ptr(false)
 					// Add as single-column primary key constraint
 					constraint := &Constraint{
-						Type:    "PRIMARY KEY",
-						Columns: []string{column.Name},
+						Type: gut.Ptr("PRIMARY KEY"),
+						Columns: []*string{
+							column.Name,
+						},
 					}
 					table.Constraints = append(table.Constraints, constraint)
 					j++
 				} else if attr == "UNIQUE" {
 					// * handle inline `UNIQUE`
 					constraint := &Constraint{
-						Type:    "UNIQUE",
-						Columns: []string{column.Name},
+						Type: gut.Ptr("UNIQUE"),
+						Columns: []*string{
+							column.Name,
+						},
 					}
 					table.Constraints = append(table.Constraints, constraint)
 				} else if attr == "REFERENCES" && j+1 < len(parts) {
 					// * handle inline foreign key
 					constraint := &Constraint{
-						Type:       "FOREIGN KEY",
-						Columns:    []string{column.Name},
-						References: parts[j+1],
+						Type: gut.Ptr("FOREIGN KEY"),
+						Columns: []*string{
+							column.Name,
+						},
+						References: &parts[j+1],
 					}
 					table.Constraints = append(table.Constraints, constraint)
 					j++
@@ -299,8 +317,8 @@ func ParseCreateFunction(lines []string, index *int) *Function {
 
 	functionText := strings.Join(functionLines, " ")
 	return &Function{
-		Name: "function", // Simplified - would need proper parsing
-		Body: functionText,
+		Name: gut.Ptr("function"),
+		Body: &functionText,
 	}
 }
 
@@ -320,8 +338,8 @@ func ParseCreateTrigger(lines []string, index *int) *Trigger {
 
 	triggerText := strings.Join(triggerLines, " ")
 	return &Trigger{
-		Name:     "trigger", // Simplified - would need proper parsing
-		Function: triggerText,
+		Name:     gut.Ptr("trigger"),
+		Function: &triggerText,
 	}
 }
 
@@ -360,8 +378,8 @@ func ParseAlterTable(lines []string, index *int, tables map[string]*Table) {
 						columnName = strings.Trim(strings.TrimSuffix(columnName, ";"), `";`)
 					}
 					// * remove column from table
-					for i, col := range table.Columns {
-						if col.Name == columnName {
+					for i, column := range table.Columns {
+						if *column.Name == columnName {
 							table.Columns = append(table.Columns[:i], table.Columns[i+1:]...)
 							break
 						}
@@ -379,9 +397,9 @@ func ParseAlterTable(lines []string, index *int, tables map[string]*Table) {
 					if len(alterParts) > 3 && strings.ToUpper(alterParts[3]) == "TYPE" && len(alterParts) > 4 {
 						newType := strings.TrimSuffix(alterParts[4], ";")
 						// Update the column type
-						for i, col := range table.Columns {
-							if col.Name == columnName {
-								table.Columns[i].Type = newType
+						for i, column := range table.Columns {
+							if *column.Name == columnName {
+								table.Columns[i].Type = &newType
 								break
 							}
 						}
@@ -391,26 +409,4 @@ func ParseAlterTable(lines []string, index *int, tables map[string]*Table) {
 			}
 		}
 	}
-}
-
-type Column struct {
-	Name        string
-	Type        string
-	Nullable    bool
-	Default     string
-	Constraints []string
-}
-
-type Index struct {
-	Name    string
-	Columns []string
-	Unique  bool
-	Type    string
-}
-
-type Constraint struct {
-	Name       string
-	Type       string
-	Columns    []string
-	References string
 }
