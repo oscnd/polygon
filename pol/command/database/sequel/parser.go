@@ -52,12 +52,12 @@ func NewParser(app index.App) (*Parser, error) {
 
 		// * check if migration directory exists
 		if _, err := os.Stat(migrationDir); os.IsNotExist(err) {
-			continue // skip directories without migration
+			continue
 		}
 
 		// * create connection for this directory
 		connection := &Connection{
-			Dialect: gut.Ptr("postgres"), // default
+			Dialect: nil,
 			Tables:  make(map[string]*Table),
 		}
 
