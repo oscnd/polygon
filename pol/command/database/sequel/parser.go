@@ -66,7 +66,6 @@ func NewParser(app index.App) (*Parser, error) {
 			log.Printf("Warning: failed to parse directory %s: %v", dirName, err)
 			continue
 		}
-
 		// * ensure dialect is set to postgres
 		if connection.Dialect == nil {
 			connection.Dialect = gut.Ptr("postgres")

@@ -87,6 +87,9 @@ connections:
                         include: base
                     visibility:
                         include: base
+                    visit_count:
+                        include: base
+                        feature: ["sort", "increase"]
                 additions: []
             profiles:
                 fields:
@@ -96,12 +99,14 @@ connections:
                         include: base
                     display_name:
                         include: base
+                        feature: ["sort"]
                     handle:
                         include: base
                     id:
                         include: base
                     is_public:
                         include: base
+                        feature: ["filter"]
                     updated_at:
                         include: base
                     user_id:

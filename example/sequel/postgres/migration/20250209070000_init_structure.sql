@@ -40,12 +40,13 @@ CREATE TABLE follows
 
 CREATE TABLE posts
 (
-    id         BIGSERIAL PRIMARY KEY,
-    profile_id BIGINT REFERENCES profiles (id) ON DELETE CASCADE NOT NULL,
-    caption    TEXT                                              NULL,
-    visibility VARCHAR(30)                                       NOT NULL DEFAULT 'PUBLIC',
-    created_at TIMESTAMP                                         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP                                         NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id          BIGSERIAL PRIMARY KEY,
+    profile_id  BIGINT REFERENCES profiles (id) ON DELETE CASCADE NOT NULL,
+    caption     TEXT                                              NULL,
+    visit_count INTEGER                                           NOT NULL DEFAULT 0,
+    visibility  VARCHAR(30)                                       NOT NULL DEFAULT 'PUBLIC',
+    created_at  TIMESTAMP                                         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP                                         NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE medias

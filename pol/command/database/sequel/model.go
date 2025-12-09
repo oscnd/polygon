@@ -24,7 +24,8 @@ type ConfigTable struct {
 }
 
 type ConfigField struct {
-	Include *string `yaml:"include"`
+	Include *string   `yaml:"include"`
+	Feature []*string `yaml:"feature"`
 }
 
 type ConfigAddition struct {
@@ -34,13 +35,13 @@ type ConfigAddition struct {
 }
 
 func Model(parser *Parser, dirName string) error {
-	// * get connection for this directory
+	// * get connection
 	connection, exists := parser.Connections[dirName]
 	if !exists {
 		return fmt.Errorf("connection not found for directory: %s", dirName)
 	}
 
-	// * generate Go structs for each table in this connection
+	// * generate structs
 	for tableName, table := range connection.Tables {
 		if err := ModelGenerate(tableName, table, parser, dirName); err != nil {
 			return fmt.Errorf("failed to generate model for table %s: %w", tableName, err)
@@ -194,32 +195,32 @@ func ModelParseExistingStructs(content string) map[string]string {
 func ModelOrganizeStructs(baseName, mainStruct, additionStruct, contractionStruct, addedStruct, joinedStruct, parentedStruct string, existingStructs map[string]string) []string {
 	var ordered []string
 
-	// * 1. main model (e.g., User, Profile)
+	// * main model
 	if mainStruct != "" {
 		ordered = append(ordered, mainStruct)
 	}
 
-	// * 2. model addition (e.g., UserAddition)
+	// * addition model
 	if additionStruct != "" {
 		ordered = append(ordered, additionStruct)
 	}
 
-	// * 3. model contraction (e.g., UserContraction)
+	// * contraction model
 	if contractionStruct != "" {
 		ordered = append(ordered, contractionStruct)
 	}
 
-	// * 4. Model added (e.g., UserAdded)
+	// * added model
 	if addedStruct != "" {
 		ordered = append(ordered, addedStruct)
 	}
 
-	// * 5. Model joined (e.g., UserJoined)
+	// * joined model
 	if joinedStruct != "" {
 		ordered = append(ordered, joinedStruct)
 	}
 
-	// * 6. Model parented (e.g., ProfileParented)
+	// * parented model
 	if parentedStruct != "" {
 		ordered = append(ordered, parentedStruct)
 	}
@@ -278,8 +279,6 @@ func ModelGenerateFileContent(orderedStructs []string, requiredImports []string)
 		builder.WriteString("\n")
 	}
 
-	// * TODO: preserve other non-struct declarations from existing content
-
 	return builder.String()
 }
 
@@ -307,7 +306,7 @@ func ModelParseStructFields(structContent string) map[string]string {
 				fieldType := parts[1]
 				// * check for JSON tag in the complete line
 				if strings.Contains(trimmed, "`json:") {
-					// * extract JSON tag for proper camelCase
+					// * extract JSON tag for proper camel case
 					start := strings.Index(trimmed, "`json:\"") + 7
 					end := strings.Index(trimmed[start:], "\"")
 					if end != -1 {
