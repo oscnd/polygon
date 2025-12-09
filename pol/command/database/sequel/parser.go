@@ -150,11 +150,10 @@ func (r *Parser) ParseConfig() error {
 		}
 		// * file not found is not fatal, use empty config
 		r.Config = &Config{Connections: make(map[string]*ConfigConnection)}
-		return nil
-	}
-
-	if err := yaml.Unmarshal(configData, &r.Config); err != nil {
-		return fmt.Errorf("failed to parse sequel.yml: %w", err)
+	} else {
+		if err := yaml.Unmarshal(configData, &r.Config); err != nil {
+			return fmt.Errorf("failed to parse sequel.yml: %w", err)
+		}
 	}
 
 	// * revise sequel config based on connections
@@ -210,30 +209,55 @@ func (r *Parser) ReviseConfig() error {
 			tableConfig, tableExists := connectionConfig.Tables[*table.Name]
 			if !tableExists {
 				tableConfig = &ConfigTable{
-					Fields:    make(map[string]*ConfigField),
-					Additions: []*ConfigAddition{},
+					Fields:    make([]*ConfigField, 0),
+					Additions: make([]*ConfigAddition, 0),
 				}
 				connectionConfig.Tables[*table.Name] = tableConfig
 				updated = true
 			}
 
-			// * ensure fields map exists
-			if tableConfig.Fields == nil {
-				tableConfig.Fields = make(map[string]*ConfigField)
+			// * create map of existing fields
+			fields := tableConfig.Fields
+			fieldMap := make(map[string]*ConfigField)
+			for _, field := range tableConfig.Fields {
+				if field.Name != nil {
+					fieldMap[*field.Name] = field
+				}
 			}
 
-			// * add missing fields with include: "base"
+			// * rebuild fields
+			tableConfig.Fields = make([]*ConfigField, 0, len(table.Columns))
+
 			for _, column := range table.Columns {
-				if _, fieldExists := tableConfig.Fields[*column.Name]; !fieldExists {
-					tableConfig.Fields[*column.Name] = &ConfigField{
-						Include: gut.Ptr("base"),
-					}
-					updated = true
-				} else {
+				columnName := *column.Name
+				if fieldConfig, exists := fieldMap[columnName]; exists {
+					// * field exists, use it
+					tableConfig.Fields = append(tableConfig.Fields, fieldConfig)
+
 					// * update existing nil includes to "base"
-					if tableConfig.Fields[*column.Name].Include == nil {
-						tableConfig.Fields[*column.Name].Include = gut.Ptr("base")
+					if fieldConfig.Include == nil {
+						fieldConfig.Include = gut.Ptr("base")
 						updated = true
+					}
+				} else {
+					// * field doesn't exist, create new one
+					tableConfig.Fields = append(tableConfig.Fields, &ConfigField{
+						Name:    gut.Ptr(columnName),
+						Include: gut.Ptr("base"),
+						Feature: nil,
+					})
+					updated = true
+				}
+			}
+
+			// * check if fields changed (order or count)
+			if len(fields) != len(tableConfig.Fields) {
+				updated = true
+			} else {
+				for i, field := range fields {
+					if i >= len(tableConfig.Fields) || field != tableConfig.Fields[i] {
+						updated = true
+						break
 					}
 				}
 			}
@@ -275,18 +299,18 @@ func (r *Parser) IsIncludeEqual(include *string, target string) bool {
 }
 
 func (r *Parser) ValidateFields(tableConfig *ConfigTable, table *Table) error {
-	for fieldName, fieldConfig := range tableConfig.Fields {
-		if fieldConfig.Include != nil && r.ShouldIncludeField(fieldConfig.Include) {
+	for _, fieldConfig := range tableConfig.Fields {
+		if fieldConfig.Name != nil && fieldConfig.Include != nil && r.ShouldIncludeField(fieldConfig.Include) {
 			// * check if field exists in database schema
 			found := false
 			for _, col := range table.Columns {
-				if *col.Name == fieldName {
+				if *col.Name == *fieldConfig.Name {
 					found = true
 					break
 				}
 			}
 			if !found {
-				return fmt.Errorf("field '%s' from sequel.yml not found in table '%s' database schema", fieldName, *table.Name)
+				return fmt.Errorf("field '%s' from sequel.yml not found in table '%s' database schema", *fieldConfig.Name, *table.Name)
 			}
 		}
 	}
@@ -315,7 +339,7 @@ func (r *Parser) GenerateStruct(name string, table *Table, tableConfig *ConfigTa
 		// * check if field should be included based on config
 		shouldInclude := true
 		if tableConfig != nil && tableConfig.Fields != nil {
-			if fieldConfig, exists := tableConfig.Fields[*col.Name]; exists {
+			if fieldConfig := tableConfig.Field(*col.Name); fieldConfig != nil {
 				shouldInclude = r.ShouldIncludeField(fieldConfig.Include)
 			}
 		}
@@ -360,12 +384,12 @@ func (r *Parser) GenerateAdditionStruct(structName string, additions []*ConfigAd
 	return builder.String()
 }
 
-func (r *Parser) GenerateContractionStruct(structName string, fields map[string]*ConfigField, table *Table) string {
+func (r *Parser) GenerateContractionStruct(structName string, fields []*ConfigField, table *Table) string {
 	// * find excluded fields (include: false or "none")
 	var excludedFields []string
-	for fieldName, fieldConfig := range fields {
-		if !r.ShouldIncludeField(fieldConfig.Include) {
-			excludedFields = append(excludedFields, fieldName)
+	for _, fieldConfig := range fields {
+		if fieldConfig.Name != nil && !r.ShouldIncludeField(fieldConfig.Include) {
+			excludedFields = append(excludedFields, *fieldConfig.Name)
 		}
 	}
 
@@ -406,7 +430,7 @@ func (r *Parser) GenerateAdded(baseName string, table *Table, additionStruct, co
 		// * check if field should be included based on config
 		shouldInclude := true
 		if tableConfig != nil && tableConfig.Fields != nil {
-			if fieldConfig, exists := tableConfig.Fields[*col.Name]; exists {
+			if fieldConfig := tableConfig.Field(*col.Name); fieldConfig != nil {
 				shouldInclude = r.ShouldIncludeField(fieldConfig.Include)
 			}
 		}

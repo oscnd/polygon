@@ -63,9 +63,9 @@ func QuerierGenerate(querierDir, entityName string, table *Table, connection *Co
 	// * write single file for the table
 	tableName := fmt.Sprintf("%ss", entityName) // plural form
 	filename := fmt.Sprintf("%s.sql", tableName)
-	filepath := filepath.Join(querierDir, filename)
+	path := filepath.Join(querierDir, filename)
 
-	if err := os.WriteFile(filepath, []byte(builder.String()), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(builder.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write querier file %s: %w", filename, err)
 	}
 
@@ -82,7 +82,7 @@ type QuerierTableConfig struct {
 // QuerierGetTableConfig extracts field features from table config
 func QuerierGetTableConfig(parser *Parser, dirName string, table *Table) *QuerierTableConfig {
 	config := &QuerierTableConfig{
-		SortableFields: []string{"id", "created_at", "updated_at"}, // default sortable fields
+		SortableFields: []string{},
 		FilterFields:   []string{},
 		IncreaseFields: []string{},
 	}
@@ -116,18 +116,16 @@ func QuerierGetColumnFeatures(parser *Parser, dirName, tableName, columnName str
 
 	if dialectConfig, exists := parser.Config.Connections[dirName]; exists {
 		if tableConfig, exists := dialectConfig.Tables[tableName]; exists {
-			if fieldConfig, exists := tableConfig.Fields[columnName]; exists {
-				if fieldConfig.Include != nil {
-					// * return the feature array from config
-					if fieldConfig.Feature != nil {
-						features := make([]string, 0, len(fieldConfig.Feature))
-						for _, feature := range fieldConfig.Feature {
-							if feature != nil {
-								features = append(features, *feature)
-							}
+			if fieldConfig := tableConfig.Field(columnName); fieldConfig != nil && fieldConfig.Include != nil {
+				// * return the feature array from config
+				if fieldConfig.Feature != nil {
+					features := make([]string, 0, len(fieldConfig.Feature))
+					for _, feature := range fieldConfig.Feature {
+						if feature != nil {
+							features = append(features, *feature)
 						}
-						return features
 					}
+					return features
 				}
 			}
 		}

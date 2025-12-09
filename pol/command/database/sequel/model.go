@@ -9,31 +9,6 @@ import (
 	"go.scnd.dev/polygon/polygon/util"
 )
 
-type Config struct {
-	Connections map[string]*ConfigConnection `yaml:"connections"`
-}
-
-type ConfigConnection struct {
-	Dialect *string                 `yaml:"dialect"`
-	Tables  map[string]*ConfigTable `yaml:"tables"`
-}
-
-type ConfigTable struct {
-	Fields    map[string]*ConfigField `yaml:"fields"`
-	Additions []*ConfigAddition       `yaml:"additions"`
-}
-
-type ConfigField struct {
-	Include *string   `yaml:"include"`
-	Feature []*string `yaml:"feature"`
-}
-
-type ConfigAddition struct {
-	Name    *string `yaml:"name"`
-	Package *string `yaml:"package"`
-	Type    *string `yaml:"type"`
-}
-
 func Model(parser *Parser, dirName string) error {
 	// * get connection
 	connection, exists := parser.Connections[dirName]

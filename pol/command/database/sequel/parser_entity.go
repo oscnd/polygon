@@ -5,6 +5,42 @@ import (
 	"strings"
 )
 
+type Config struct {
+	Connections map[string]*ConfigConnection `yaml:"connections"`
+}
+
+type ConfigConnection struct {
+	Dialect *string                 `yaml:"dialect"`
+	Tables  map[string]*ConfigTable `yaml:"tables"`
+}
+
+type ConfigTable struct {
+	Fields    []*ConfigField    `yaml:"fields"`
+	Additions []*ConfigAddition `yaml:"additions"`
+}
+
+// Field method to retrieve field by name
+func (r *ConfigTable) Field(name string) *ConfigField {
+	for _, field := range r.Fields {
+		if field.Name != nil && *field.Name == name {
+			return field
+		}
+	}
+	return nil
+}
+
+type ConfigField struct {
+	Name    *string   `yaml:"name"`
+	Include *string   `yaml:"include"`
+	Feature []*string `yaml:"feature,omitempty"`
+}
+
+type ConfigAddition struct {
+	Name    *string `yaml:"name"`
+	Package *string `yaml:"package"`
+	Type    *string `yaml:"type"`
+}
+
 type Connection struct {
 	Dialect *string
 	Tables  map[string]*Table

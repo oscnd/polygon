@@ -4,136 +4,140 @@ connections:
         tables:
             comment_reactions:
                 fields:
-                    comment_id:
-                        include: base
-                    created_at:
-                        include: base
-                    profile_id:
-                        include: base
-                    reaction_name:
-                        include: base
-                    updated_at:
-                        include: base
+                    - name: comment_id
+                      include: base
+                    - name: profile_id
+                      include: base
+                    - name: reaction_name
+                      include: base
+                    - name: created_at
+                      include: base
+                    - name: updated_at
+                      include: base
                 additions: []
             comments:
                 fields:
-                    content:
-                        include: base
-                    created_at:
-                        include: base
-                    id:
-                        include: base
-                    parent_comment_id:
-                        include: base
-                    post_id:
-                        include: base
-                    profile_id:
-                        include: base
-                    updated_at:
-                        include: base
+                    - name: id
+                      include: base
+                    - name: post_id
+                      include: base
+                    - name: profile_id
+                      include: base
+                    - name: parent_comment_id
+                      include: base
+                    - name: content
+                      include: base
+                    - name: created_at
+                      include: base
+                    - name: updated_at
+                      include: base
                 additions: []
             follows:
                 fields:
-                    approved_at:
-                        include: base
-                    created_at:
-                        include: base
-                    followed_profile_id:
-                        include: base
-                    follower_profile_id:
-                        include: base
-                    updated_at:
-                        include: base
+                    - name: follower_profile_id
+                      include: base
+                    - name: followed_profile_id
+                      include: base
+                    - name: approved_at
+                      include: base
+                    - name: created_at
+                      include: base
+                    - name: updated_at
+                      include: base
                 additions: []
             medias:
                 fields:
-                    created_at:
-                        include: base
-                    id:
-                        include: base
-                    media_type:
-                        include: base
-                    ordering:
-                        include: base
-                    post_id:
-                        include: base
-                    updated_at:
-                        include: base
+                    - name: id
+                      include: base
+                    - name: post_id
+                      include: base
+                    - name: media_type
+                      include: base
+                    - name: ordering
+                      include: base
+                    - name: created_at
+                      include: base
+                    - name: updated_at
+                      include: base
                 additions: []
             post_reactions:
                 fields:
-                    created_at:
-                        include: base
-                    post_id:
-                        include: base
-                    profile_id:
-                        include: base
-                    reaction_name:
-                        include: base
-                    updated_at:
-                        include: base
+                    - name: post_id
+                      include: base
+                    - name: profile_id
+                      include: base
+                    - name: reaction_name
+                      include: base
+                    - name: created_at
+                      include: base
+                    - name: updated_at
+                      include: base
                 additions: []
             posts:
                 fields:
-                    caption:
-                        include: base
-                    created_at:
-                        include: base
-                    id:
-                        include: base
-                    profile_id:
-                        include: base
-                    updated_at:
-                        include: base
-                    visibility:
-                        include: base
-                    visit_count:
-                        include: base
-                        feature: ["sort", "increase"]
+                    - name: id
+                      include: base
+                    - name: profile_id
+                      include: base
+                    - name: caption
+                      include: base
+                    - name: visit_count
+                      include: base
+                      feature:
+                        - sort
+                        - increase
+                    - name: visibility
+                      include: base
+                    - name: created_at
+                      include: base
+                    - name: updated_at
+                      include: base
                 additions: []
             profiles:
                 fields:
-                    bio:
-                        include: base
-                    created_at:
-                        include: base
-                    display_name:
-                        include: base
-                        feature: ["sort"]
-                    handle:
-                        include: base
-                    id:
-                        include: base
-                    is_public:
-                        include: base
-                        feature: ["filter"]
-                    updated_at:
-                        include: base
-                    user_id:
-                        include: base
+                    - name: id
+                      include: base
+                    - name: user_id
+                      include: base
+                    - name: handle
+                      include: base
+                    - name: display_name
+                      include: base
+                      feature:
+                        - sort
+                    - name: bio
+                      include: base
+                    - name: is_public
+                      include: base
+                      feature:
+                        - filter
+                    - name: created_at
+                      include: base
+                    - name: updated_at
+                      include: base
                 additions: []
             users:
                 fields:
-                    created_at:
-                        include: base
-                    email:
-                        include: base
-                    id:
-                        include: base
-                    is_active:
-                        include: base
-                    metadata:
-                        include: base
-                    oid:
-                        include: base
-                    password_hash:
-                        include: none
-                    totp_secret:
-                        include: none
-                    updated_at:
-                        include: base
-                    username:
-                        include: base
+                    - name: id
+                      include: base
+                    - name: oid
+                      include: base
+                    - name: username
+                      include: base
+                    - name: email
+                      include: base
+                    - name: password_hash
+                      include: none
+                    - name: totp_secret
+                      include: none
+                    - name: is_active
+                      include: base
+                    - name: metadata
+                      include: base
+                    - name: created_at
+                      include: base
+                    - name: updated_at
+                      include: base
                 additions:
                     - name: picture_url
                       package: null
