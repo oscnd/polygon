@@ -3,6 +3,9 @@ package sequel
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
 
 	"go.scnd.dev/polygon/pol/index"
 )
@@ -37,6 +40,66 @@ func Schema(app index.App) error {
 		}
 
 		log.Printf("generated schema, models, and queriers for %s", dirName)
+	}
+
+	// * run sqlc generate programmatically
+	log.Printf("running sqlc generate...")
+	if err := RunSqlcGenerate(); err != nil {
+		log.Printf("Error running sqlc generate: %v", err)
+		return fmt.Errorf("failed to run sqlc generate: %w", err)
+	}
+
+	// * apply type replacements
+	log.Printf("applying type replacements...")
+	if err := ReplaceGeneratedTypes(parser); err != nil {
+		log.Printf("Error applying type replacements: %v", err)
+		return fmt.Errorf("failed to apply type replacements: %w", err)
+	}
+
+	// * replace DBTX and Querier in psql files
+	log.Printf("replacing DBTX and Querier...")
+	if err := ReplaceDBTXAndQuerier(parser); err != nil {
+		log.Printf("Error replacing DBTX and Querier: %v", err)
+		return fmt.Errorf("failed to replace DBTX and Querier: %w", err)
+	}
+
+	log.Printf("completed sqlc generation and replacements")
+	return nil
+}
+
+// RunSqlcGenerate runs sqlc generate programmatically
+func RunSqlcGenerate() error {
+	// Change to the directory containing sqlc.yml
+	originalDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Find and change to the directory containing sqlc.yml
+	sqlcDir := originalDir
+	for {
+		if _, err := os.Stat("sqlc.yml"); err == nil {
+			break
+		}
+		parent := filepath.Dir(sqlcDir)
+		if parent == sqlcDir {
+			return fmt.Errorf("sqlc.yml not found in any parent directory")
+		}
+		sqlcDir = parent
+	}
+
+	if err := os.Chdir(sqlcDir); err != nil {
+		return fmt.Errorf("failed to change directory to %s: %w", sqlcDir, err)
+	}
+	defer os.Chdir(originalDir)
+
+	// Run sqlc generate
+	cmd := exec.Command("sqlc", "generate")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("sqlc generate failed: %w", err)
 	}
 
 	return nil

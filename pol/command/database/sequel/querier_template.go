@@ -483,8 +483,8 @@ func QuerierBuildJoinsFromFields(connection *Connection, table *Table, join *Con
 			// * add table to path
 			pathTables = append(pathTables, referencedTable)
 
-			// * build alias from table names (plural, underscore-separated)
-			alias := strings.Join(pathTables, "_")
+			// * build alias
+			alias := "joined_" + strings.Join(pathTables, "_")
 
 			// * ensure alias is unique (in case of conflicts)
 			if _, exists := processedJoins[joinKey]; exists {
@@ -516,7 +516,7 @@ func QuerierBuildJoinsFromFields(connection *Connection, table *Table, join *Con
 			// * record this join
 			processedJoins[joinKey] = alias
 
-			// * track this embed name (use alias directly)
+			// * track this embed name (use alias for sqlc.embed)
 			embedNamesByTable[referencedTable] = append(embedNamesByTable[referencedTable], alias)
 
 			// * add to group by
@@ -528,17 +528,18 @@ func QuerierBuildJoinsFromFields(connection *Connection, table *Table, join *Con
 		}
 	}
 
-	// * build join conditions grouped by table name
+	// * build join conditions
 	var joinConditions []string
 	for _, tableJoins := range joinsByTable {
 		joinConditions = append(joinConditions, tableJoins...)
 	}
 
-	// * generate select fields using table names (not aliases for sqlc.embed)
-	for table, aliases := range embedNamesByTable {
+	// * generate select fields using aliases for sqlc.embed
+	for _, aliases := range embedNamesByTable {
 		if len(aliases) > 0 {
-			// Use the first alias as the table reference, but embed the actual table
-			selectFields = append(selectFields, fmt.Sprintf("sqlc.embed(%s)", table))
+			for _, alias := range aliases {
+				selectFields = append(selectFields, fmt.Sprintf("sqlc.embed(%s)", alias))
+			}
 		}
 	}
 

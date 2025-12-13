@@ -1,5 +1,5 @@
 .PHONY: generate
-generate: init sqlc vert mock
+generate: init vert mock
 
 .PHONY: init
 init:
@@ -7,25 +7,6 @@ init:
 	mkdir -p .local/dist
 	touch .local/dist/index.html
 
-.PHONY: sqlc
-sqlc:
-	sqlc generate
-	find ./generate/*sql -type f \( -name "models.go" -o -name "*.sql.go" -o -name "querier.go" \) -exec sed -i '' \
-		-e 's/\"database\/sql\"//g' \
-		-e 's/string/\*string/g' \
-		-e 's/\([^:]\)bool/\1*bool/g' \
-		-e 's/int64/\*uint64/g' \
-		-e 's/int32/\*int32/g' \
-		-e 's/float64/\*float64/g' \
-		-e 's/time\.Time/\*time.Time/g' \
-		-e 's/sql\.NullString/\*string/g' \
-		-e 's/sql\.NullTime/\*time.Time/g' \
-		-e 's/sql\.NullInt64/\*uint64/g' \
-		-e 's/sql\.NullInt32/\*int32/g' \
-		-e 's/sql\.NullFloat64/\*float64/g' \
-		-e 's/sql\.NullBool/\*bool/g' \
-		{} +
-	find ./generate/psql -type f -exec sed -i '' -e 's/DBTX/PDBTX/g' -e 's/Querier/PQuerier/g' {} +
 
 .PHONY: vert
 vert:
