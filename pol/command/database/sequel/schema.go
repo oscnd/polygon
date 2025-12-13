@@ -8,15 +8,15 @@ import (
 )
 
 func Schema(app index.App) error {
-	// * 1. new parser (once)
+	// * construct parser
 	parser, err := NewParser(app)
 	if err != nil {
 		return fmt.Errorf("error creating parser: %w", err)
 	}
 
-	// * 2. process each directory for summary and models
+	// * process each connection directory
 	for dirName := range parser.Connections {
-		log.Printf("processing schema and models for %s...", dirName)
+		log.Printf("processing schema, models, and queriers for %s...", dirName)
 
 		// * call Summary for each directory
 		if err := Summary(parser, dirName); err != nil {
@@ -30,7 +30,13 @@ func Schema(app index.App) error {
 			continue
 		}
 
-		log.Printf("generated schema and models for %s", dirName)
+		// * call Querier for each directory
+		if err := Querier(parser, dirName); err != nil {
+			log.Printf("Error generating queriers for %s: %v", dirName, err)
+			continue
+		}
+
+		log.Printf("generated schema, models, and queriers for %s", dirName)
 	}
 
 	return nil
