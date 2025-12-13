@@ -174,49 +174,6 @@ func QuerierGenerateAllQueries(connection *Connection, parser *Parser, table *Ta
 	return queries
 }
 
-// QuerierGenerateCombinations generates all combinations of parent tables for With queriers
-func QuerierGenerateCombinations(parentTables []string) [][]string {
-	var combinations [][]string
-
-	// * add single parent combinations in order
-	for _, table := range parentTables {
-		combinations = append(combinations, []string{table})
-	}
-
-	// * add combinations of multiple parents
-	if len(parentTables) > 1 {
-		// * generate combinations of 2 or more parents
-		for i := 1; i < (1 << uint(len(parentTables))); i++ {
-			var combination []string
-			for j, table := range parentTables {
-				if i&(1<<uint(j)) != 0 {
-					combination = append(combination, table)
-				}
-			}
-			if len(combination) > 1 {
-				combinations = append(combinations, combination)
-			}
-		}
-	}
-
-	return combinations
-}
-
-// QuerierGetParentTableNames extracts parent table names from foreign key references
-func QuerierGetParentTableNames(fkRefs map[string]string) []string {
-	var parents []string
-	seen := make(map[string]bool)
-
-	for _, refTable := range fkRefs {
-		if !seen[refTable] {
-			parents = append(parents, refTable)
-			seen[refTable] = true
-		}
-	}
-
-	return parents
-}
-
 // QuerierGetForeignKeyReferences returns a map of column names to their referenced tables
 func QuerierGetForeignKeyReferences(table *Table) map[string]string {
 	references := make(map[string]string)
@@ -239,6 +196,112 @@ func QuerierGetChildTables(connection *Connection, tableName string) []*Table {
 		}
 	}
 	return children
+}
+
+// QuerierGetPrimaryKeyColumns returns the primary key columns for a table
+func QuerierGetPrimaryKeyColumns(table *Table) []string {
+	var pkColumns []string
+	for _, constraint := range table.Constraints {
+		if *constraint.Type == "PRIMARY KEY" {
+			for _, col := range constraint.Columns {
+				pkColumns = append(pkColumns, *col)
+			}
+		}
+	}
+
+	// If no explicit primary key constraint, check if there's an 'id' column
+	if len(pkColumns) == 0 {
+		for _, column := range table.Columns {
+			if *column.Name == "id" {
+				pkColumns = append(pkColumns, "id")
+				break
+			}
+		}
+	}
+
+	return pkColumns
+}
+
+// QuerierGetPrimaryKeyWhereClause returns the WHERE clause for the primary key
+func QuerierGetPrimaryKeyWhereClause(table *Table, paramIndex int) string {
+	pkColumns := QuerierGetPrimaryKeyColumns(table)
+	if len(pkColumns) == 0 {
+		// Fallback to id if no primary key found
+		return fmt.Sprintf("id = $%d", paramIndex)
+	}
+
+	if len(pkColumns) == 1 {
+		return fmt.Sprintf("%s = $%d", pkColumns[0], paramIndex)
+	}
+
+	// For composite primary keys, use a tuple
+	var conditions []string
+	for i, col := range pkColumns {
+		conditions = append(conditions, fmt.Sprintf("%s = $%d", col, paramIndex+i))
+	}
+	return "(" + strings.Join(conditions, " AND ") + ")"
+}
+
+// QuerierGetPrimaryKeyWhereInClause returns the WHERE IN clause for the primary key
+func QuerierGetPrimaryKeyWhereInClause(table *Table, paramIndex int) string {
+	pkColumns := QuerierGetPrimaryKeyColumns(table)
+	if len(pkColumns) == 0 {
+		// Fallback to id if no primary key found
+		return fmt.Sprintf("id = ANY($%d::BIGINT[])", paramIndex)
+	}
+
+	if len(pkColumns) == 1 {
+		return fmt.Sprintf("%s = ANY($%d::BIGINT[])", pkColumns[0], paramIndex)
+	}
+
+	// For composite keys, we can't use ANY, need to use multiple conditions
+	// This is a limitation - composite keys with IN clauses need special handling
+	return fmt.Sprintf("(%s) = ANY($%d::BIGINT[])", strings.Join(pkColumns, ", "), paramIndex)
+}
+
+// QuerierGetPrimaryKeyWhereClauseForUpdate returns the WHERE clause for the Update query
+func QuerierGetPrimaryKeyWhereClauseForUpdate(table *Table) string {
+	pkColumns := QuerierGetPrimaryKeyColumns(table)
+	tableName := *table.Name
+	if len(pkColumns) == 0 {
+		// Fallback to id if no primary key found
+		return fmt.Sprintf("%s.id = sqlc.narg('id')::BIGINT", tableName)
+	}
+
+	if len(pkColumns) == 1 {
+		return fmt.Sprintf("%s.%s = sqlc.narg('id')::BIGINT", tableName, pkColumns[0])
+	}
+
+	// For composite primary keys, use named parameters with proper mapping
+	var conditions []string
+	for i, col := range pkColumns {
+		paramName := "id"
+		if i > 0 {
+			paramName = col
+		}
+		conditions = append(conditions, fmt.Sprintf("%s.%s = sqlc.narg('%s')::BIGINT", tableName, col, paramName))
+	}
+	return strings.Join(conditions, " AND ")
+}
+
+// QuerierGetPrimaryKeyWhereClauseWithTable returns the WHERE clause with table prefix
+func QuerierGetPrimaryKeyWhereClauseWithTable(table *Table, paramIndex int, tableName string) string {
+	pkColumns := QuerierGetPrimaryKeyColumns(table)
+	if len(pkColumns) == 0 {
+		// Fallback to id if no primary key found
+		return fmt.Sprintf("%s.id = $%d", tableName, paramIndex)
+	}
+
+	if len(pkColumns) == 1 {
+		return fmt.Sprintf("%s.%s = $%d", tableName, pkColumns[0], paramIndex)
+	}
+
+	// For composite primary keys, use a tuple with qualified column names
+	var conditions []string
+	for i, col := range pkColumns {
+		conditions = append(conditions, fmt.Sprintf("%s.%s = $%d", tableName, col, paramIndex+i))
+	}
+	return "(" + strings.Join(conditions, " AND ") + ")"
 }
 
 // * get join configurations for a table

@@ -5,6 +5,7 @@ sql:
       - sequel/postgres/migration/*.sql
     queries:
       - sequel/postgres/*.sql
+      - generate/polygon/sequel/postgres/*.sql
     gen:
       go:
         package: psql
