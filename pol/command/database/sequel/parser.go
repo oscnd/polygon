@@ -281,6 +281,13 @@ func (r *Parser) ReviseConfig() error {
 		}
 	}
 
+	// * validate joins for all directories
+	for connName := range r.Connections {
+		if err := r.ValidateJoins(connName); err != nil {
+			return fmt.Errorf("join validation failed for directory %s: %w", connName, err)
+		}
+	}
+
 	return nil
 }
 
@@ -722,4 +729,207 @@ func (r *Parser) convertAdditionType(addition *ConfigAddition) string {
 	}
 
 	return "*string"
+}
+
+// * validate joins for all tables in a directory
+func (r *Parser) ValidateJoins(dirName string) error {
+	if r.Config == nil || r.Config.Connections == nil {
+		return nil
+	}
+
+	if dialectConfig, exists := r.Config.Connections[dirName]; exists {
+		if connection, connExists := r.Connections[dirName]; connExists {
+			for tableName, tableConfig := range dialectConfig.Tables {
+				if _, tableExists := connection.Tables[tableName]; tableExists {
+					if err := r.ValidateJoinConfig(tableConfig, connection); err != nil {
+						return fmt.Errorf("validation failed for table %s: %w", tableName, err)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// * validate join configuration for a table
+func (r *Parser) ValidateJoinConfig(tableConfig *ConfigTable, connection *Connection) error {
+	if tableConfig.Joins == nil {
+		return nil
+	}
+
+	for _, join := range tableConfig.Joins {
+		if err := r.ValidateSingleJoin(join, connection); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// * validate a single join configuration
+func (r *Parser) ValidateSingleJoin(join *ConfigJoin, connection *Connection) error {
+	// * check that type is "parented"
+	if join.Type == nil || *join.Type != "parented" {
+		return fmt.Errorf("join type must be 'parented', got: %v", join.Type)
+	}
+
+	// * check that table exists
+	if join.Table == nil || *join.Table == "" {
+		return fmt.Errorf("join table is required")
+	}
+
+	table, exists := connection.Tables[*join.Table]
+	if !exists {
+		return fmt.Errorf("table '%s' not found in schema", *join.Table)
+	}
+
+	// * validate fields
+	if err := r.ValidateJoinFields(join.Fields, table, connection); err != nil {
+		return fmt.Errorf("invalid fields for table '%s': %w", *join.Table, err)
+	}
+
+	return nil
+}
+
+// * validate fields in join configuration
+func (r *Parser) ValidateJoinFields(fields []*string, originTable *Table, connection *Connection) error {
+	if fields == nil || len(fields) == 0 {
+		return nil
+	}
+
+	for _, fieldPtr := range fields {
+		if fieldPtr == nil {
+			continue
+		}
+
+		fieldPath := *fieldPtr
+		if fieldPath == "" {
+			continue
+		}
+
+		// * parse the field path
+		pathParts := r.ParseJoinFieldPath(fieldPath)
+		if len(pathParts) == 0 {
+			return fmt.Errorf("invalid field path: '%s'", fieldPath)
+		}
+
+		// * validate the field path
+		if err := r.ValidateFieldPath(pathParts, originTable, connection); err != nil {
+			return fmt.Errorf("invalid field path '%s': %w", fieldPath, err)
+		}
+	}
+
+	return nil
+}
+
+// * parse dot notation field path
+func (r *Parser) ParseJoinFieldPath(fieldPath string) []string {
+	if fieldPath == "" {
+		return nil
+	}
+
+	// * split by dots
+	parts := strings.Split(fieldPath, ".")
+	var result []string
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+
+	return result
+}
+
+// * validate if a field path exists and follows parent relationships
+func (r *Parser) ValidateFieldPath(path []string, originTable *Table, connection *Connection) error {
+	if len(path) == 0 {
+		return fmt.Errorf("empty field path")
+	}
+
+	// * first part must be a foreign key field in the origin table
+	currentTable := originTable
+	fkFieldName := path[0]
+
+	// * check if field exists and is a foreign key
+	var foundConstraint *Constraint
+	for _, constraint := range currentTable.Constraints {
+		if *constraint.Type == "FOREIGN KEY" && len(constraint.Columns) == 1 {
+			if *constraint.Columns[0] == fkFieldName {
+				foundConstraint = constraint
+				break
+			}
+		}
+	}
+
+	if foundConstraint == nil {
+		return fmt.Errorf("foreign key field '%s' not found in table '%s'", fkFieldName, *currentTable.Name)
+	}
+
+	// * if only one part, we're done (just a foreign key reference)
+	if len(path) == 1 {
+		return nil
+	}
+
+	// * for paths with dots, validate the chain of parent relationships
+	for i := 1; i < len(path); i++ {
+		// * we need to find the foreign key from the table that was referenced in the previous step
+		// * get the referenced table from the previous constraint
+		referencedTable := *foundConstraint.References
+		if parenIndex := strings.Index(referencedTable, "("); parenIndex != -1 {
+			referencedTable = strings.TrimSpace(referencedTable[:parenIndex])
+		}
+
+		nextTable, exists := connection.Tables[referencedTable]
+		if !exists {
+			return fmt.Errorf("referenced table '%s' not found in schema", referencedTable)
+		}
+
+		// * now find the foreign key from this table to the next part in the path
+		var nextFoundConstraint *Constraint
+		for _, constraint := range nextTable.Constraints {
+			if *constraint.Type == "FOREIGN KEY" && len(constraint.Columns) == 1 {
+				nextRefTable := *constraint.References
+				if parenIndex := strings.Index(nextRefTable, "("); parenIndex != -1 {
+					nextRefTable = strings.TrimSpace(nextRefTable[:parenIndex])
+				}
+
+				// * check if path part matches referenced table name
+				if nextRefTable == path[i] {
+					nextFoundConstraint = constraint
+					break
+				}
+
+				// * check if path part matches column name
+				if *constraint.Columns[0] == path[i] {
+					nextFoundConstraint = constraint
+					break
+				}
+			}
+		}
+
+		if nextFoundConstraint == nil {
+			// * try to find table by exact name match
+			for _, constraint := range nextTable.Constraints {
+				if *constraint.Type == "FOREIGN KEY" && len(constraint.Columns) == 1 {
+					refTable := *constraint.References
+					if strings.Contains(refTable, path[i]) {
+						nextFoundConstraint = constraint
+						break
+					}
+				}
+			}
+		}
+
+		if nextFoundConstraint == nil {
+			return fmt.Errorf("no parent relationship found from table '%s' to '%s'", *nextTable.Name, path[i])
+		}
+
+		foundConstraint = nextFoundConstraint
+		currentTable = nextTable
+	}
+
+	return nil
 }

@@ -17,6 +17,7 @@ type ConfigConnection struct {
 type ConfigTable struct {
 	Fields    []*ConfigField    `yaml:"fields"`
 	Additions []*ConfigAddition `yaml:"additions"`
+	Joins     []*ConfigJoin     `yaml:"joins,omitempty"`
 }
 
 // Field method to retrieve field by name
@@ -39,6 +40,12 @@ type ConfigAddition struct {
 	Name    *string `yaml:"name"`
 	Package *string `yaml:"package"`
 	Type    *string `yaml:"type"`
+}
+
+type ConfigJoin struct {
+	Type   *string   `yaml:"type"`   // Must be "parented"
+	Table  *string   `yaml:"table"`  // Originate table
+	Fields []*string `yaml:"fields"` // Fields with .notation for parent refs
 }
 
 type Connection struct {

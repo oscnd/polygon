@@ -29,7 +29,7 @@ func Querier(parser *Parser, dirName string) error {
 		singularTableName := util.ToSingular(tableName)
 
 		// * generate all required queriers for this table
-		if err := QuerierGenerate(querierDir, singularTableName, table, connection, parser, dirName); err != nil {
+		if err := QuerierGenerate(connection, parser, table, dirName, querierDir, singularTableName); err != nil {
 			return fmt.Errorf("failed to generate queriers for table %s: %w", tableName, err)
 		}
 	}
@@ -41,12 +41,12 @@ func Querier(parser *Parser, dirName string) error {
 	return nil
 }
 
-func QuerierGenerate(querierDir, entityName string, table *Table, connection *Connection, parser *Parser, dirName string) error {
+func QuerierGenerate(connection *Connection, parser *Parser, table *Table, dirName, querierDir, entityName string) error {
 	// * get table config for features
-	tableConfig := QuerierGetTableConfig(parser, dirName, table)
+	tableConfig := QuerierGetTableConfig(connection, parser, dirName, table)
 
 	// * generate all querier types
-	queriers := QuerierGenerateAllQueries(entityName, table, connection, tableConfig)
+	queriers := QuerierGenerateAllQueries(connection, parser, table, dirName, tableConfig, entityName)
 
 	builder := new(strings.Builder)
 
@@ -80,7 +80,7 @@ type QuerierTableConfig struct {
 }
 
 // QuerierGetTableConfig extracts field features from table config
-func QuerierGetTableConfig(parser *Parser, dirName string, table *Table) *QuerierTableConfig {
+func QuerierGetTableConfig(connection *Connection, parser *Parser, dirName string, table *Table) *QuerierTableConfig {
 	config := &QuerierTableConfig{
 		SortableFields: []string{},
 		FilterFields:   []string{},
@@ -135,61 +135,41 @@ func QuerierGetColumnFeatures(parser *Parser, dirName, tableName, columnName str
 }
 
 // QuerierGenerateAllQueries generates all querier types for a table in the specified order
-func QuerierGenerateAllQueries(entityName string, table *Table, connection *Connection, tableConfig *QuerierTableConfig) []string {
+func QuerierGenerateAllQueries(connection *Connection, parser *Parser, table *Table, dirName string, tableConfig *QuerierTableConfig, entityName string) []string {
 	var queries []string
 
-	// create querier
-	queries = append(queries, QuerierGenerateCreate(entityName, table, connection))
+	// * check if table has join configuration
+	joins := QuerierGetJoinConfigurations(parser, dirName, *table.Name)
 
-	// update querier
-	queries = append(queries, QuerierGenerateUpdate(entityName, table, connection))
+	// * generate basic queriers
+	queries = append(queries, QuerierGenerateCreate(connection, entityName, table))
+	queries = append(queries, QuerierGenerateUpdate(connection, entityName, table))
+	queries = append(queries, QuerierGenerateCount(connection, entityName, table, tableConfig))
+	queries = append(queries, QuerierGenerateOne(connection, entityName, table))
+	queries = append(queries, QuerierGenerateOneCounted(connection, entityName, table))
+	queries = append(queries, QuerierGenerateMany(connection, entityName, table, tableConfig))
+	queries = append(queries, QuerierGenerateManyCounted(connection, entityName, table))
+	queries = append(queries, QuerierGenerateList(connection, entityName, table, tableConfig))
 
-	// count querier
-	queries = append(queries, QuerierGenerateCount(entityName, table, connection, tableConfig))
-
-	// one querier
-	queries = append(queries, QuerierGenerateOne(entityName, table, connection))
-
-	// one querier with combinations
-	fkRefs := QuerierGetForeignKeyReferences(table)
-	parentTables := QuerierGetParentTableNames(fkRefs)
-
-	for _, combination := range QuerierGenerateCombinations(parentTables) {
-		if len(combination) > 0 {
-			queries = append(queries, QuerierGenerateOneWith(entityName, table, connection, combination))
-		}
-	}
-
-	// * one counted querier
-	queries = append(queries, QuerierGenerateOneCounted(entityName, table, connection))
-
-	// * many querier
-	queries = append(queries, QuerierGenerateMany(entityName, table, connection, tableConfig))
-
-	// * many queriers with combinations
-	for _, combination := range QuerierGenerateCombinations(parentTables) {
-		if len(combination) > 0 {
-			queries = append(queries, QuerierGenerateManyWith(entityName, table, connection, tableConfig, combination))
-		}
-	}
-
-	// * list querier
-	queries = append(queries, QuerierGenerateList(entityName, table, connection, tableConfig))
-
-	// * list with combinations
-	for _, combination := range QuerierGenerateCombinations(parentTables) {
-		if len(combination) > 0 {
-			queries = append(queries, QuerierGenerateListWith(entityName, table, connection, tableConfig, combination))
+	// * generate "With" queriers only if join configuration exists
+	if len(joins) > 0 {
+		for _, join := range joins {
+			joinName := QuerierBuildJoinName(join, connection, table)
+			if joinName != "" {
+				queries = append(queries, QuerierGenerateOneWithJoin(connection, entityName, table, join, joinName))
+				queries = append(queries, QuerierGenerateManyWithJoin(connection, entityName, table, tableConfig, join, joinName))
+				queries = append(queries, QuerierGenerateListWithJoin(connection, entityName, table, tableConfig, join, joinName))
+			}
 		}
 	}
 
 	// * increase queriers
 	for _, field := range tableConfig.IncreaseFields {
-		queries = append(queries, QuerierGenerateIncrease(entityName, table, field))
+		queries = append(queries, QuerierGenerateIncrease(connection, entityName, table, field))
 	}
 
-	// * delete  querier
-	queries = append(queries, QuerierGenerateDelete(entityName, table, connection))
+	// * delete querier
+	queries = append(queries, QuerierGenerateDelete(connection, entityName, table))
 
 	return queries
 }
@@ -259,4 +239,133 @@ func QuerierGetChildTables(connection *Connection, tableName string) []*Table {
 		}
 	}
 	return children
+}
+
+// * get join configurations for a table
+func QuerierGetJoinConfigurations(parser *Parser, dirName, tableName string) []*ConfigJoin {
+	// * get table config from parser
+	if parser.Config == nil || parser.Config.Connections == nil {
+		return nil
+	}
+
+	if dialectConfig, exists := parser.Config.Connections[dirName]; exists {
+		if tableConfig, exists := dialectConfig.Tables[tableName]; exists {
+			return tableConfig.Joins
+		}
+	}
+
+	return nil
+}
+
+// * build join name from join configuration
+func QuerierBuildJoinName(join *ConfigJoin, connection *Connection, table *Table) string {
+	if join == nil || len(join.Fields) == 0 {
+		return ""
+	}
+
+	// * collect root-level foreign keys (fields without dots)
+	rootPaths := make(map[string][]string)
+
+	for _, fieldPtr := range join.Fields {
+		if fieldPtr == nil {
+			continue
+		}
+
+		fieldPath := *fieldPtr
+		if fieldPath == "" {
+			continue
+		}
+
+		parts := strings.Split(fieldPath, ".")
+		if len(parts) == 0 {
+			continue
+		}
+
+		// * get root column name
+		rootColumn := parts[0]
+
+		// * track the full path for this root
+		if _, exists := rootPaths[rootColumn]; !exists {
+			rootPaths[rootColumn] = []string{}
+		}
+		rootPaths[rootColumn] = append(rootPaths[rootColumn], fieldPath)
+	}
+
+	// * build name parts from each root path chain
+	var nameParts []string
+
+	for _, paths := range rootPaths {
+		// * find the longest path for this root
+		longestPath := ""
+		for _, path := range paths {
+			if len(path) > len(longestPath) {
+				longestPath = path
+			}
+		}
+
+		// * convert path to table names
+		pathTables := QuerierPathToTableNames(longestPath, table, connection)
+
+		// * join table names (plural form)
+		if len(pathTables) > 0 {
+			nameParts = append(nameParts, strings.Join(pathTables, ""))
+		}
+	}
+
+	if len(nameParts) == 0 {
+		return ""
+	}
+
+	return "With" + strings.Join(nameParts, "And")
+}
+
+// * convert field path to table names in title case plural form
+func QuerierPathToTableNames(fieldPath string, originTable *Table, connection *Connection) []string {
+	parts := strings.Split(fieldPath, ".")
+	if len(parts) == 0 {
+		return nil
+	}
+
+	var tableNames []string
+	currentTable := originTable
+
+	for _, columnName := range parts {
+		// * find FK constraint
+		var foundConstraint *Constraint
+		for _, constraint := range currentTable.Constraints {
+			if *constraint.Type == "FOREIGN KEY" && len(constraint.Columns) == 1 {
+				if *constraint.Columns[0] == columnName {
+					foundConstraint = constraint
+					break
+				}
+			}
+		}
+
+		if foundConstraint == nil {
+			break
+		}
+
+		// * get referenced table
+		referencedTable := *foundConstraint.References
+		if parenIndex := strings.Index(referencedTable, "("); parenIndex != -1 {
+			referencedTable = strings.TrimSpace(referencedTable[:parenIndex])
+		}
+
+		nextTable, exists := connection.Tables[referencedTable]
+		if !exists {
+			break
+		}
+
+		// * add table name in title case (keep plural)
+		tableNames = append(tableNames, util.ToTitleCase(referencedTable))
+		currentTable = nextTable
+	}
+
+	return tableNames
+}
+
+// * check if table has join configuration
+func QuerierHasJoinConfiguration(parser *Parser, dirName, tableName string) bool {
+	joins := QuerierGetJoinConfigurations(parser, dirName, tableName)
+	return len(joins) > 0
 }
