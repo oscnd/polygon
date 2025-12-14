@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"go.scnd.dev/polygon/pol/command/database/sequel"
+	"go.scnd.dev/polygon/pol/command/inter"
 	"go.scnd.dev/polygon/pol/common/config"
 	"go.scnd.dev/polygon/pol/index"
 )
@@ -65,6 +66,7 @@ func main() {
 			fmt.Printf("  -v: verbose output\n\n")
 			fmt.Printf("Subcommands:\n")
 			fmt.Printf("  database sequel schema\t generate database schema from migrations\n")
+			fmt.Printf("  interface\t\t\t generate interfaces from receiver methods\n")
 			return
 		}
 		fmt.Printf("Usage: %s -d <directory> <subcommand>\n", filepath.Base(os.Args[0]))
@@ -92,6 +94,11 @@ func main() {
 			}
 		} else {
 			println("unknown database subcommand:", args[1], args[2])
+		}
+	case "interface":
+		err := inter.InterfaceGenerate(app)
+		if err != nil {
+			log.Fatalf("error generating interfaces: %v", err)
 		}
 	default:
 		println("unknown subcommand:", subcommand)
