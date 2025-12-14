@@ -26,10 +26,9 @@ func Querier(parser *Parser, dirName string) error {
 	// * generate queriers for each table
 	for _, tableName := range SortedTableKeys(connection.Tables) {
 		table := connection.Tables[tableName]
-		singularTableName := util.ToSingular(tableName)
 
 		// * generate all required queriers for this table
-		if err := QuerierGenerate(connection, parser, table, dirName, querierDir, singularTableName); err != nil {
+		if err := QuerierGenerate(connection, parser, table, dirName, querierDir); err != nil {
 			return fmt.Errorf("failed to generate queriers for table %s: %w", tableName, err)
 		}
 	}
@@ -41,18 +40,18 @@ func Querier(parser *Parser, dirName string) error {
 	return nil
 }
 
-func QuerierGenerate(connection *Connection, parser *Parser, table *Table, dirName, querierDir, entityName string) error {
+func QuerierGenerate(connection *Connection, parser *Parser, table *Table, dirName, querierDir string) error {
 	// * get table config for features
 	tableConfig := QuerierGetTableConfig(connection, parser, dirName, table)
 
 	// * generate all querier types
-	queriers := QuerierGenerateAllQueries(connection, parser, table, dirName, tableConfig, entityName)
+	queriers := QuerierGenerateAllQueries(connection, parser, table, dirName, tableConfig)
 
 	builder := new(strings.Builder)
 
 	// * add header comment
 	builder.WriteString("-- POLYGON GENERATED\n")
-	builder.WriteString(fmt.Sprintf("-- table: %s\n\n", entityName))
+	builder.WriteString(fmt.Sprintf("-- table: %s\n\n", *table.SingularName))
 
 	// * generate each querier and concatenate
 	for _, querier := range queriers {
@@ -61,8 +60,7 @@ func QuerierGenerate(connection *Connection, parser *Parser, table *Table, dirNa
 	}
 
 	// * write single file for the table
-	tableName := fmt.Sprintf("%ss", entityName) // plural form
-	filename := fmt.Sprintf("%s.sql", tableName)
+	filename := fmt.Sprintf("%s.sql", *table.Name)
 	path := filepath.Join(querierDir, filename)
 
 	if err := os.WriteFile(path, []byte(builder.String()), 0644); err != nil {
@@ -135,41 +133,41 @@ func QuerierGetColumnFeatures(parser *Parser, dirName, tableName, columnName str
 }
 
 // QuerierGenerateAllQueries generates all querier types for a table in the specified order
-func QuerierGenerateAllQueries(connection *Connection, parser *Parser, table *Table, dirName string, tableConfig *QuerierTableConfig, entityName string) []string {
+func QuerierGenerateAllQueries(connection *Connection, parser *Parser, table *Table, dirName string, tableConfig *QuerierTableConfig) []string {
 	var queries []string
 
 	// * check if table has join configuration
 	joins := QuerierGetJoinConfigurations(parser, dirName, *table.Name)
 
 	// * generate basic queriers
-	queries = append(queries, QuerierGenerateCount(connection, entityName, table, tableConfig))
-	queries = append(queries, QuerierGenerateCreate(connection, entityName, table))
-	queries = append(queries, QuerierGenerateUpdate(connection, entityName, table))
-	queries = append(queries, QuerierGenerateOne(connection, entityName, table))
-	queries = append(queries, QuerierGenerateOneCounted(connection, entityName, table))
-	queries = append(queries, QuerierGenerateMany(connection, entityName, table, tableConfig))
-	queries = append(queries, QuerierGenerateManyCounted(connection, entityName, table))
-	queries = append(queries, QuerierGenerateList(connection, entityName, table, tableConfig))
+	queries = append(queries, QuerierGenerateCount(connection, table, tableConfig))
+	queries = append(queries, QuerierGenerateCreate(connection, table))
+	queries = append(queries, QuerierGenerateUpdate(connection, table))
+	queries = append(queries, QuerierGenerateOne(connection, table))
+	queries = append(queries, QuerierGenerateOneCounted(connection, table))
+	queries = append(queries, QuerierGenerateMany(connection, table, tableConfig))
+	queries = append(queries, QuerierGenerateManyCounted(connection, table))
+	queries = append(queries, QuerierGenerateList(connection, table, tableConfig))
 
 	// * generate "With" queriers only if join configuration exists
 	if len(joins) > 0 {
 		for _, join := range joins {
 			joinName := QuerierBuildJoinName(join, connection, table)
 			if joinName != "" {
-				queries = append(queries, QuerierGenerateOneWithJoin(connection, entityName, table, join, joinName))
-				queries = append(queries, QuerierGenerateManyWithJoin(connection, entityName, table, tableConfig, join, joinName))
-				queries = append(queries, QuerierGenerateListWithJoin(connection, entityName, table, tableConfig, join, joinName))
+				queries = append(queries, QuerierGenerateOneWithJoin(connection, table, join, joinName))
+				queries = append(queries, QuerierGenerateManyWithJoin(connection, table, tableConfig, join, joinName))
+				queries = append(queries, QuerierGenerateListWithJoin(connection, table, tableConfig, join, joinName))
 			}
 		}
 	}
 
 	// * increase queriers
 	for _, field := range tableConfig.IncreaseFields {
-		queries = append(queries, QuerierGenerateIncrease(connection, entityName, table, field))
+		queries = append(queries, QuerierGenerateIncrease(connection, table, field))
 	}
 
 	// * delete querier
-	queries = append(queries, QuerierGenerateDelete(connection, entityName, table))
+	queries = append(queries, QuerierGenerateDelete(connection, table))
 
 	return queries
 }

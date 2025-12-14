@@ -54,10 +54,11 @@ type Connection struct {
 }
 
 type Table struct {
-	Name        *string
-	Columns     []*Column
-	Indexes     []*Index
-	Constraints []*Constraint
+	Name         *string
+	SingularName *string
+	Columns      []*Column
+	Indexes      []*Index
+	Constraints  []*Constraint
 }
 
 type Column struct {
