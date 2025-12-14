@@ -17,10 +17,8 @@ func Summary(parser *Parser, dirName string) error {
 	// * generate final schema content
 	var schemaContent strings.Builder
 	schemaContent.WriteString("-- POLYGON GENERATED\n")
-	schemaContent.WriteString("-- database schema: ")
-	schemaContent.WriteString(dirName)
-	schemaContent.WriteString("\n-- dialect: ")
-	schemaContent.WriteString(*connection.Dialect)
+	schemaContent.WriteString("-- database schema: " + dirName)
+	schemaContent.WriteString("\n-- dialect: " + *connection.Dialect)
 	schemaContent.WriteString("\n\n")
 
 	functions := make(map[string]*Function)

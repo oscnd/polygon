@@ -57,13 +57,11 @@ func Schema(app index.App) error {
 	}
 
 	// * replace DBTX and Querier in psql files
-	log.Printf("replacing DBTX and Querier...")
 	if err := ReplaceDBTXAndQuerier(parser); err != nil {
 		log.Printf("Error replacing DBTX and Querier: %v", err)
 		return fmt.Errorf("failed to replace DBTX and Querier: %w", err)
 	}
 
-	log.Printf("completed sqlc generation and replacements")
 	return nil
 }
 

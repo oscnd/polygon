@@ -142,9 +142,9 @@ func QuerierGenerateAllQueries(connection *Connection, parser *Parser, table *Ta
 	joins := QuerierGetJoinConfigurations(parser, dirName, *table.Name)
 
 	// * generate basic queriers
+	queries = append(queries, QuerierGenerateCount(connection, entityName, table, tableConfig))
 	queries = append(queries, QuerierGenerateCreate(connection, entityName, table))
 	queries = append(queries, QuerierGenerateUpdate(connection, entityName, table))
-	queries = append(queries, QuerierGenerateCount(connection, entityName, table, tableConfig))
 	queries = append(queries, QuerierGenerateOne(connection, entityName, table))
 	queries = append(queries, QuerierGenerateOneCounted(connection, entityName, table))
 	queries = append(queries, QuerierGenerateMany(connection, entityName, table, tableConfig))
