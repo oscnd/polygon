@@ -360,9 +360,9 @@ func (r *Parser) GenerateStruct(name string, table *Table, tableConfig *ConfigTa
 
 			// * generate field
 			if !*col.Nullable {
-				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToTitleCase(*col.Name), goType, jsonTag))
+				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToPascalCase(*col.Name), goType, jsonTag))
 			} else {
-				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", util.ToTitleCase(*col.Name), goType, jsonTag))
+				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", util.ToPascalCase(*col.Name), goType, jsonTag))
 			}
 		}
 	}
@@ -383,7 +383,7 @@ func (r *Parser) GenerateAdditionStruct(structName string, additions []*ConfigAd
 		if addition.Name != nil {
 			fieldType := r.convertAdditionType(addition)
 			builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n",
-				util.ToTitleCase(*addition.Name), fieldType, util.ToCamelCase(*addition.Name)))
+				util.ToPascalCase(*addition.Name), fieldType, util.ToCamelCase(*addition.Name)))
 		}
 	}
 
@@ -418,7 +418,7 @@ func (r *Parser) GenerateContractionStruct(structName string, fields []*ConfigFi
 			}
 		}
 		builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n",
-			util.ToTitleCase(field), goType, util.ToCamelCase(field)))
+			util.ToPascalCase(field), goType, util.ToCamelCase(field)))
 	}
 	builder.WriteString("}\n")
 	return builder.String()
@@ -446,9 +446,9 @@ func (r *Parser) GenerateAdded(baseName string, table *Table, additionStruct, co
 			goType := r.SqlToGoType(*col.Type, !*col.Nullable, *col.Name, *table.Name)
 			jsonTag := util.ToCamelCase(*col.Name)
 			if !*col.Nullable {
-				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToTitleCase(*col.Name), goType, jsonTag))
+				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\" validate:\"required\"`\n", util.ToPascalCase(*col.Name), goType, jsonTag))
 			} else {
-				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", util.ToTitleCase(*col.Name), goType, jsonTag))
+				builder.WriteString(fmt.Sprintf("    %s %s `json:\"%s\"`\n", util.ToPascalCase(*col.Name), goType, jsonTag))
 			}
 		}
 	}
@@ -585,7 +585,7 @@ func (r *Parser) GetRelationships(tableName, relationshipType string) []string {
 						if strings.Contains(rel, currentStructName+"s []*"+currentStructName) {
 							// * create unique name based on first FK column
 							if len(constraint.Columns) > 0 {
-								suffix := util.ToTitleCase(*constraint.Columns[0])
+								suffix := util.ToPascalCase(*constraint.Columns[0])
 								fieldName = currentStructName + "s" + suffix
 							} else {
 								fieldName = baseFieldName + fmt.Sprintf("%d", i+1)
@@ -607,7 +607,7 @@ func (r *Parser) GetRelationships(tableName, relationshipType string) []string {
 						for i, rel := range relationships {
 							if strings.Contains(rel, referencedStructName+" *"+referencedStructName) {
 								if len(constraint.Columns) > 0 {
-									suffix := util.ToTitleCase(*constraint.Columns[0])
+									suffix := util.ToPascalCase(*constraint.Columns[0])
 									fieldName = referencedStructName + suffix
 								} else {
 									fieldName = referencedStructName + fmt.Sprintf("%d", i+1)

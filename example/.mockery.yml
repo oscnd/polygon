@@ -1,0 +1,11 @@
+all: true
+dir: "generate/mockery"
+pkgname: "mockery"
+filename: "mock_{{.InterfaceDir|dir|base}}_{{.InterfaceFile|dir|base}}_{{.InterfaceName|lower}}.go"
+structname: "Mock{{.InterfaceDir|dir|base|firstUpper}}{{.InterfaceFile|dir|base|firstUpper}}{{.InterfaceName|firstUpper}}"
+force-file-write: true
+template: testify
+recursive: true
+packages:
+  ./...:
+    interfaces:

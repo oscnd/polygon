@@ -26,10 +26,9 @@ func Querier(parser *Parser, dirName string) error {
 	// * generate queriers for each table
 	for _, tableName := range SortedTableKeys(connection.Tables) {
 		table := connection.Tables[tableName]
-		singularTableName := util.ToSingular(tableName)
 
 		// * generate all required queriers for this table
-		if err := QuerierGenerate(connection, parser, table, dirName, querierDir, singularTableName); err != nil {
+		if err := QuerierGenerate(connection, parser, table, dirName, querierDir); err != nil {
 			return fmt.Errorf("failed to generate queriers for table %s: %w", tableName, err)
 		}
 	}
@@ -41,18 +40,18 @@ func Querier(parser *Parser, dirName string) error {
 	return nil
 }
 
-func QuerierGenerate(connection *Connection, parser *Parser, table *Table, dirName, querierDir, entityName string) error {
+func QuerierGenerate(connection *Connection, parser *Parser, table *Table, dirName, querierDir string) error {
 	// * get table config for features
 	tableConfig := QuerierGetTableConfig(connection, parser, dirName, table)
 
 	// * generate all querier types
-	queriers := QuerierGenerateAllQueries(connection, parser, table, dirName, tableConfig, entityName)
+	queriers := QuerierGenerateAllQueries(connection, parser, table, dirName, tableConfig)
 
 	builder := new(strings.Builder)
 
 	// * add header comment
 	builder.WriteString("-- POLYGON GENERATED\n")
-	builder.WriteString(fmt.Sprintf("-- table: %s\n\n", entityName))
+	builder.WriteString(fmt.Sprintf("-- table: %s\n\n", *table.SingularName))
 
 	// * generate each querier and concatenate
 	for _, querier := range queriers {
@@ -61,8 +60,7 @@ func QuerierGenerate(connection *Connection, parser *Parser, table *Table, dirNa
 	}
 
 	// * write single file for the table
-	tableName := fmt.Sprintf("%ss", entityName) // plural form
-	filename := fmt.Sprintf("%s.sql", tableName)
+	filename := fmt.Sprintf("%s.sql", *table.Name)
 	path := filepath.Join(querierDir, filename)
 
 	if err := os.WriteFile(path, []byte(builder.String()), 0644); err != nil {
@@ -135,86 +133,43 @@ func QuerierGetColumnFeatures(parser *Parser, dirName, tableName, columnName str
 }
 
 // QuerierGenerateAllQueries generates all querier types for a table in the specified order
-func QuerierGenerateAllQueries(connection *Connection, parser *Parser, table *Table, dirName string, tableConfig *QuerierTableConfig, entityName string) []string {
+func QuerierGenerateAllQueries(connection *Connection, parser *Parser, table *Table, dirName string, tableConfig *QuerierTableConfig) []string {
 	var queries []string
 
 	// * check if table has join configuration
 	joins := QuerierGetJoinConfigurations(parser, dirName, *table.Name)
 
 	// * generate basic queriers
-	queries = append(queries, QuerierGenerateCreate(connection, entityName, table))
-	queries = append(queries, QuerierGenerateUpdate(connection, entityName, table))
-	queries = append(queries, QuerierGenerateCount(connection, entityName, table, tableConfig))
-	queries = append(queries, QuerierGenerateOne(connection, entityName, table))
-	queries = append(queries, QuerierGenerateOneCounted(connection, entityName, table))
-	queries = append(queries, QuerierGenerateMany(connection, entityName, table, tableConfig))
-	queries = append(queries, QuerierGenerateManyCounted(connection, entityName, table))
-	queries = append(queries, QuerierGenerateList(connection, entityName, table, tableConfig))
+	queries = append(queries, QuerierGenerateCount(connection, table, tableConfig))
+	queries = append(queries, QuerierGenerateCreate(connection, table))
+	queries = append(queries, QuerierGenerateUpdate(connection, table))
+	queries = append(queries, QuerierGenerateOne(connection, table))
+	queries = append(queries, QuerierGenerateOneCounted(connection, table))
+	queries = append(queries, QuerierGenerateMany(connection, table, tableConfig))
+	queries = append(queries, QuerierGenerateManyCounted(connection, table))
+	queries = append(queries, QuerierGenerateList(connection, table, tableConfig))
 
 	// * generate "With" queriers only if join configuration exists
 	if len(joins) > 0 {
 		for _, join := range joins {
 			joinName := QuerierBuildJoinName(join, connection, table)
 			if joinName != "" {
-				queries = append(queries, QuerierGenerateOneWithJoin(connection, entityName, table, join, joinName))
-				queries = append(queries, QuerierGenerateManyWithJoin(connection, entityName, table, tableConfig, join, joinName))
-				queries = append(queries, QuerierGenerateListWithJoin(connection, entityName, table, tableConfig, join, joinName))
+				queries = append(queries, QuerierGenerateOneWithJoin(connection, table, join, joinName))
+				queries = append(queries, QuerierGenerateManyWithJoin(connection, table, tableConfig, join, joinName))
+				queries = append(queries, QuerierGenerateListWithJoin(connection, table, tableConfig, join, joinName))
 			}
 		}
 	}
 
 	// * increase queriers
 	for _, field := range tableConfig.IncreaseFields {
-		queries = append(queries, QuerierGenerateIncrease(connection, entityName, table, field))
+		queries = append(queries, QuerierGenerateIncrease(connection, table, field))
 	}
 
 	// * delete querier
-	queries = append(queries, QuerierGenerateDelete(connection, entityName, table))
+	queries = append(queries, QuerierGenerateDelete(connection, table))
 
 	return queries
-}
-
-// QuerierGenerateCombinations generates all combinations of parent tables for With queriers
-func QuerierGenerateCombinations(parentTables []string) [][]string {
-	var combinations [][]string
-
-	// * add single parent combinations in order
-	for _, table := range parentTables {
-		combinations = append(combinations, []string{table})
-	}
-
-	// * add combinations of multiple parents
-	if len(parentTables) > 1 {
-		// * generate combinations of 2 or more parents
-		for i := 1; i < (1 << uint(len(parentTables))); i++ {
-			var combination []string
-			for j, table := range parentTables {
-				if i&(1<<uint(j)) != 0 {
-					combination = append(combination, table)
-				}
-			}
-			if len(combination) > 1 {
-				combinations = append(combinations, combination)
-			}
-		}
-	}
-
-	return combinations
-}
-
-// QuerierGetParentTableNames extracts parent table names from foreign key references
-func QuerierGetParentTableNames(fkRefs map[string]string) []string {
-	var parents []string
-	seen := make(map[string]bool)
-
-	for _, refTable := range fkRefs {
-		if !seen[refTable] {
-			parents = append(parents, refTable)
-			seen[refTable] = true
-		}
-	}
-
-	return parents
 }
 
 // QuerierGetForeignKeyReferences returns a map of column names to their referenced tables
@@ -239,6 +194,117 @@ func QuerierGetChildTables(connection *Connection, tableName string) []*Table {
 		}
 	}
 	return children
+}
+
+// QuerierGetPrimaryKeyColumns returns the primary key columns for a table
+func QuerierGetPrimaryKeyColumns(table *Table) []string {
+	var pkColumns []string
+	for _, constraint := range table.Constraints {
+		if *constraint.Type == "PRIMARY KEY" {
+			for _, col := range constraint.Columns {
+				pkColumns = append(pkColumns, *col)
+			}
+		}
+	}
+
+	// If no explicit primary key constraint, check if there's an 'id' column
+	if len(pkColumns) == 0 {
+		for _, column := range table.Columns {
+			if *column.Name == "id" {
+				pkColumns = append(pkColumns, "id")
+				break
+			}
+		}
+	}
+
+	return pkColumns
+}
+
+// QuerierGetPrimaryKeyWhereClause returns the WHERE clause for the primary key
+func QuerierGetPrimaryKeyWhereClause(table *Table, paramIndex int) string {
+	pkColumns := QuerierGetPrimaryKeyColumns(table)
+	if len(pkColumns) == 0 {
+		// Fallback to id if no primary key found
+		return fmt.Sprintf("id = $%d", paramIndex)
+	}
+
+	if len(pkColumns) == 1 {
+		return fmt.Sprintf("%s = $%d", pkColumns[0], paramIndex)
+	}
+
+	// For composite primary keys, use a tuple
+	var conditions []string
+	for i, col := range pkColumns {
+		conditions = append(conditions, fmt.Sprintf("%s = $%d", col, paramIndex+i))
+	}
+	return "(" + strings.Join(conditions, " AND ") + ")"
+}
+
+// QuerierGetPrimaryKeyWhereInClause returns the WHERE IN clause for the primary key
+func QuerierGetPrimaryKeyWhereInClause(table *Table, paramIndex int) string {
+	pkColumns := QuerierGetPrimaryKeyColumns(table)
+	if len(pkColumns) == 0 {
+		// Fallback to id if no primary key found
+		return fmt.Sprintf("id = ANY(sqlc.narg('ids')::BIGINT[])")
+	}
+
+	if len(pkColumns) == 1 {
+		paramName := util.ToSnakeCasePlural(pkColumns[0])
+		return fmt.Sprintf("%s = ANY(sqlc.narg('%s')::BIGINT[])", pkColumns[0], paramName)
+	}
+
+	// For composite keys, generate separate conditions for each column with named parameters
+	var conditions []string
+	for _, col := range pkColumns {
+		paramName := util.ToSnakeCasePlural(col)
+		conditions = append(conditions, fmt.Sprintf("%s = ANY(sqlc.narg('%s')::BIGINT[])", col, paramName))
+	}
+	return strings.Join(conditions, " AND ")
+}
+
+// QuerierGetPrimaryKeyWhereClauseForUpdate returns the WHERE clause for the Update query
+func QuerierGetPrimaryKeyWhereClauseForUpdate(table *Table) string {
+	pkColumns := QuerierGetPrimaryKeyColumns(table)
+	tableName := *table.Name
+	if len(pkColumns) == 0 {
+		// Fallback to id if no primary key found
+		return fmt.Sprintf("%s.id = sqlc.narg('id')::BIGINT", tableName)
+	}
+
+	if len(pkColumns) == 1 {
+		return fmt.Sprintf("%s.%s = sqlc.narg('id')::BIGINT", tableName, pkColumns[0])
+	}
+
+	// For composite primary keys, use named parameters with proper mapping
+	var conditions []string
+	for i, col := range pkColumns {
+		paramName := "id"
+		if i > 0 {
+			paramName = col
+		}
+		conditions = append(conditions, fmt.Sprintf("%s.%s = sqlc.narg('%s')::BIGINT", tableName, col, paramName))
+	}
+	return strings.Join(conditions, " AND ")
+}
+
+// QuerierGetPrimaryKeyWhereClauseWithTable returns the WHERE clause with table prefix
+func QuerierGetPrimaryKeyWhereClauseWithTable(table *Table, paramIndex int, tableName string) string {
+	pkColumns := QuerierGetPrimaryKeyColumns(table)
+	if len(pkColumns) == 0 {
+		// Fallback to id if no primary key found
+		return fmt.Sprintf("%s.id = $%d", tableName, paramIndex)
+	}
+
+	if len(pkColumns) == 1 {
+		return fmt.Sprintf("%s.%s = $%d", tableName, pkColumns[0], paramIndex)
+	}
+
+	// For composite primary keys, use a tuple with qualified column names
+	var conditions []string
+	for i, col := range pkColumns {
+		conditions = append(conditions, fmt.Sprintf("%s.%s = $%d", tableName, col, paramIndex+i))
+	}
+	return "(" + strings.Join(conditions, " AND ") + ")"
 }
 
 // * get join configurations for a table
@@ -357,7 +423,7 @@ func QuerierPathToTableNames(fieldPath string, originTable *Table, connection *C
 		}
 
 		// * add table name in title case (keep plural)
-		tableNames = append(tableNames, util.ToTitleCase(referencedTable))
+		tableNames = append(tableNames, util.ToPascalCase(referencedTable))
 		currentTable = nextTable
 	}
 
