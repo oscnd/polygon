@@ -247,16 +247,21 @@ func QuerierGetPrimaryKeyWhereInClause(table *Table, paramIndex int) string {
 	pkColumns := QuerierGetPrimaryKeyColumns(table)
 	if len(pkColumns) == 0 {
 		// Fallback to id if no primary key found
-		return fmt.Sprintf("id = ANY($%d::BIGINT[])", paramIndex)
+		return fmt.Sprintf("id = ANY(sqlc.narg('ids')::BIGINT[])")
 	}
 
 	if len(pkColumns) == 1 {
-		return fmt.Sprintf("%s = ANY($%d::BIGINT[])", pkColumns[0], paramIndex)
+		paramName := util.ToSnakeCasePlural(pkColumns[0])
+		return fmt.Sprintf("%s = ANY(sqlc.narg('%s')::BIGINT[])", pkColumns[0], paramName)
 	}
 
-	// For composite keys, we can't use ANY, need to use multiple conditions
-	// This is a limitation - composite keys with IN clauses need special handling
-	return fmt.Sprintf("(%s) = ANY($%d::BIGINT[])", strings.Join(pkColumns, ", "), paramIndex)
+	// For composite keys, generate separate conditions for each column with named parameters
+	var conditions []string
+	for _, col := range pkColumns {
+		paramName := util.ToSnakeCasePlural(col)
+		conditions = append(conditions, fmt.Sprintf("%s = ANY(sqlc.narg('%s')::BIGINT[])", col, paramName))
+	}
+	return strings.Join(conditions, " AND ")
 }
 
 // QuerierGetPrimaryKeyWhereClauseForUpdate returns the WHERE clause for the Update query
@@ -420,7 +425,7 @@ func QuerierPathToTableNames(fieldPath string, originTable *Table, connection *C
 		}
 
 		// * add table name in title case (keep plural)
-		tableNames = append(tableNames, util.ToTitleCase(referencedTable))
+		tableNames = append(tableNames, util.ToPascalCase(referencedTable))
 		currentTable = nextTable
 	}
 

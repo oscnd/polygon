@@ -2,90 +2,183 @@ package util
 
 import (
 	"strings"
-
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
+	"unicode"
 )
 
-func ToTitleCase(s string) string {
-	// * replace underscores with spaces and convert to title case, then remove spaces
-	parts := strings.Split(s, "_")
-	caser := cases.Title(language.English)
-	for i, part := range parts {
-		if part != "" {
-			parts[i] = caser.String(strings.ToLower(part))
-		}
-	}
-	return strings.Join(parts, "")
-}
-
-func ToCamelCase(s string) string {
-	// * if string contains underscores, treat as snake case
-	if strings.Contains(s, "_") {
-		parts := strings.Split(s, "_")
-		caser := cases.Title(language.English)
-		for i, part := range parts {
-			if part != "" {
-				if i == 0 {
-					parts[i] = strings.ToLower(part)
-				} else {
-					parts[i] = caser.String(strings.ToLower(part))
-				}
-			}
-		}
-		return strings.Join(parts, "")
-	}
-
-	// * check if string is already camelCase or PascalCase
+func Parser(s string) []string {
 	if s == "" {
-		return s
+		return []string{}
 	}
 
-	// * check if all characters are lowercase (already camelCase)
-	if s == strings.ToLower(s) {
-		return s
-	}
+	var segments []string
+	var current strings.Builder
 
-	// * check if all characters are uppercase
-	if s == strings.ToUpper(s) {
-		return strings.ToLower(s)
-	}
+	for i, r := range s {
+		if i == 0 {
+			current.WriteRune(unicode.ToLower(r))
+			continue
+		}
 
-	// * treat as PascalCase or mixed case - convert to camelCase
-	// * keep first character lowercase, preserve rest
-	return strings.ToLower(s[:1]) + s[1:]
-}
-
-func ToSingularTitleCase(s string) string {
-	// * convert table name to singular title case
-	singular := ToSingular(s)
-	return ToTitleCase(singular)
-}
-
-func ToSingular(s string) string {
-	// * simple plural to singular conversion
-	s = strings.ToLower(s)
-	if strings.HasSuffix(s, "ies") {
-		return strings.TrimSuffix(s, "ies") + "y"
-	}
-	if strings.HasSuffix(s, "ves") {
-		return strings.TrimSuffix(s, "ves") + "f"
-	}
-
-	// * handle words ending with 's' but not words that naturally end with 's'
-	if strings.HasSuffix(s, "s") && len(s) > 1 {
-		// * don't strip 's' from words that naturally end with 's'
-		naturalEndsWithS := []string{"status", "process", "address", "class", "series"}
-		for _, word := range naturalEndsWithS {
-			if s == word {
-				return s
+		// * split on uppercase letters or underscores
+		if unicode.IsUpper(r) || r == '_' {
+			// * add current segment if not empty
+			if current.Len() > 0 {
+				segments = append(segments, current.String())
+				current.Reset()
 			}
+			// * skip underscores
+			if r != '_' {
+				current.WriteRune(unicode.ToLower(r))
+			}
+		} else {
+			current.WriteRune(r)
 		}
-		// * special case for words ending in 'us' (like 'status' -> 'status')
-		if strings.HasSuffix(s, "us") {
-			return s
-		}
-		return strings.TrimSuffix(s, "s")
 	}
-	return s
+
+	// * add last segment
+	if current.Len() > 0 {
+		segments = append(segments, current.String())
+	}
+
+	return segments
+}
+
+// ToCamelCase converts a string to camel case
+func ToCamelCase(s string) string {
+	segments := Parser(s)
+	if len(segments) == 0 {
+		return s
+	}
+
+	// First segment is lowercase
+	result := segments[0]
+
+	// Subsequent segments have first letter uppercase
+	for i := 1; i < len(segments); i++ {
+		if len(segments[i]) > 0 {
+			result += strings.ToUpper(segments[i][:1]) + segments[i][1:]
+		}
+	}
+
+	return result
+}
+
+// ToPascalCase converts a string to pascal case
+func ToPascalCase(s string) string {
+	segments := Parser(s)
+	if len(segments) == 0 {
+		return s
+	}
+
+	var result strings.Builder
+	for _, segment := range segments {
+		if len(segment) > 0 {
+			result.WriteString(strings.ToUpper(segment[:1]))
+			result.WriteString(segment[1:])
+		}
+	}
+
+	return result.String()
+}
+
+// ToSnakeCase converts a string to snake case
+func ToSnakeCase(s string) string {
+	segments := Parser(s)
+	if len(segments) == 0 {
+		return s
+	}
+
+	return strings.Join(segments, "_")
+}
+
+// ToSnakeCasePlural converts a string to snake case plural form
+func ToSnakeCasePlural(s string) string {
+	segments := Parser(s)
+	if len(segments) == 0 {
+		return s
+	}
+
+	// * make the last segment plural
+	if len(segments) > 0 {
+		lastSeg := segments[len(segments)-1]
+		segments[len(segments)-1] = pluralize(lastSeg)
+	}
+
+	return strings.Join(segments, "_")
+}
+
+// ToSingular converts a string to singular form
+func ToSingular(s string) string {
+	segments := Parser(s)
+	if len(segments) == 0 {
+		return s
+	}
+
+	// Make the last segment singular
+	if len(segments) > 0 {
+		lastSeg := segments[len(segments)-1]
+		segments[len(segments)-1] = singularize(lastSeg)
+	}
+
+	return strings.Join(segments, "_")
+}
+
+// ToSingularTitleCase converts a string to singular title case
+func ToSingularTitleCase(s string) string {
+	singular := ToSingular(s)
+	return ToPascalCase(singular)
+}
+
+// pluralize makes a word plural
+func pluralize(word string) string {
+	if word == "" {
+		return word
+	}
+
+	lower := strings.ToLower(word)
+
+	// Basic English pluralization rules
+	switch {
+	case strings.HasSuffix(lower, "s") || strings.HasSuffix(lower, "sh") || strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "x") || strings.HasSuffix(lower, "z"):
+		return word + "es"
+	case strings.HasSuffix(lower, "y") && !strings.HasSuffix(lower, "ay") && !strings.HasSuffix(lower, "ey") && !strings.HasSuffix(lower, "iy") && !strings.HasSuffix(lower, "oy") && !strings.HasSuffix(lower, "uy"):
+		return word[:len(word)-1] + "ies"
+	case strings.HasSuffix(lower, "f"):
+		return word[:len(word)-1] + "ves"
+	case strings.HasSuffix(lower, "fe"):
+		return word[:len(word)-2] + "ves"
+	default:
+		return word + "s"
+	}
+}
+
+// singularize makes a word singular
+func singularize(word string) string {
+	if word == "" {
+		return word
+	}
+
+	lower := strings.ToLower(word)
+
+	// Basic English singularization rules (reverse of pluralize)
+	switch {
+	case strings.HasSuffix(lower, "ies"):
+		return word[:len(word)-3] + "y"
+	case strings.HasSuffix(lower, "ves"):
+		return word[:len(word)-3] + "f"
+	case strings.HasSuffix(lower, "es"):
+		// Check if it's one of the special cases
+		if strings.HasSuffix(lower, "ses") || strings.HasSuffix(lower, "shes") || strings.HasSuffix(lower, "ches") || strings.HasSuffix(lower, "xes") || strings.HasSuffix(lower, "zes") {
+			return word[:len(word)-2]
+		}
+		fallthrough
+	case strings.HasSuffix(lower, "s"):
+		// Simple case: just remove 's'
+		if len(word) > 1 {
+			return word[:len(word)-1]
+		}
+		return word
+	default:
+		return word
+	}
 }

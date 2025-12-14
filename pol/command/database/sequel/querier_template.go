@@ -8,7 +8,7 @@ import (
 )
 
 func QuerierGenerateCreate(connection *Connection, entityName string, table *Table) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName) // plural form
 
 	var columns []string
@@ -41,7 +41,7 @@ RETURNING *;`,
 
 // QuerierGenerateOne generates the basic One querier
 func QuerierGenerateOne(connection *Connection, entityName string, table *Table) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	return fmt.Sprintf(`-- name: %sOne :one
@@ -53,7 +53,7 @@ SELECT * FROM %s WHERE %s LIMIT 1;`,
 
 // QuerierGenerateOneCounted generates the OneCounted querier with child relation counts
 func QuerierGenerateOneCounted(connection *Connection, entityName string, table *Table) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	childTables := QuerierGetChildTables(connection, tableName)
@@ -83,7 +83,7 @@ LIMIT 1;`,
 
 // QuerierGenerateManyCounted generates the ManyCounted querier with child relation counts
 func QuerierGenerateManyCounted(connection *Connection, entityName string, table *Table) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	childTables := QuerierGetChildTables(connection, tableName)
@@ -112,7 +112,7 @@ WHERE %s;`,
 
 // QuerierGenerateMany generates the Many querier with IN filter
 func QuerierGenerateMany(connection *Connection, entityName string, table *Table, tableConfig *QuerierTableConfig) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	return fmt.Sprintf(`-- name: %sMany :many
@@ -124,7 +124,7 @@ SELECT * FROM %s WHERE %s;`,
 
 // QuerierGenerateCount generates the Count querier with same conditions as List
 func QuerierGenerateCount(connection *Connection, entityName string, table *Table, tableConfig *QuerierTableConfig) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	fkRefs := QuerierGetForeignKeyReferences(table)
@@ -166,8 +166,8 @@ FROM %s`,
 
 // QuerierGenerateIncrease generates the Increase querier for numeric fields
 func QuerierGenerateIncrease(connection *Connection, entityName string, table *Table, fieldName string) string {
-	entityTitleCase := util.ToTitleCase(entityName)
-	fieldTitleCase := util.ToTitleCase(fieldName)
+	entityTitleCase := util.ToPascalCase(entityName)
+	fieldTitleCase := util.ToPascalCase(fieldName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	return fmt.Sprintf(`-- name: %s%sIncrease :one
@@ -185,7 +185,7 @@ RETURNING *;`,
 }
 
 func QuerierGenerateList(connection *Connection, entityName string, table *Table, tableConfig *QuerierTableConfig) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	// * List querier does NOT have joins, only main table
@@ -224,7 +224,7 @@ func QuerierGenerateList(connection *Connection, entityName string, table *Table
 }
 
 func QuerierGenerateUpdate(connection *Connection, entityName string, table *Table) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	var setConditions []string
@@ -259,7 +259,7 @@ RETURNING *;`,
 }
 
 func QuerierGenerateDelete(connection *Connection, entityName string, table *Table) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	return fmt.Sprintf(`-- name: %sDelete :one
@@ -271,7 +271,7 @@ DELETE FROM %s WHERE %s RETURNING *;`,
 
 // * generate One querier with join configuration
 func QuerierGenerateOneWithJoin(connection *Connection, entityName string, table *Table, join *ConfigJoin, joinName string) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	// * build SELECT fields and JOINs from join configuration
@@ -299,7 +299,7 @@ func QuerierGenerateOneWithJoin(connection *Connection, entityName string, table
 
 // * generate Many querier with join configuration
 func QuerierGenerateManyWithJoin(connection *Connection, entityName string, table *Table, _ *QuerierTableConfig, join *ConfigJoin, joinName string) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	// * build SELECT fields and JOINs from join configuration
@@ -327,7 +327,7 @@ func QuerierGenerateManyWithJoin(connection *Connection, entityName string, tabl
 
 // * generate List querier with join configuration
 func QuerierGenerateListWithJoin(connection *Connection, entityName string, table *Table, tableConfig *QuerierTableConfig, join *ConfigJoin, joinName string) string {
-	entityTitleCase := util.ToTitleCase(entityName)
+	entityTitleCase := util.ToPascalCase(entityName)
 	tableName := fmt.Sprintf("%ss", entityName)
 
 	// * build SELECT fields and JOINs from join configuration
