@@ -1,0 +1,10 @@
+scans:
+  - scan_dir: procedure
+    scan_receiver_type: "*Procedure"
+    generate_interface_name: "{{ structName }}Procedure"
+    recursive: true
+
+  - scan_dir: service
+    scan_receiver_type: "*Service"
+    generate_interface_name: "{{ structName }}Service"
+    recursive: true
