@@ -67,13 +67,28 @@ func ModelGenerate(tableName string, table *Table, parser *Parser, dirName strin
 		}
 	}
 
-	// * collect required imports from addition config only
+	// * collect required imports from addition config and sqlc overrides
 	var requiredImports []string
+	seenImports := make(map[string]bool)
 
 	// * add imports from addition config
 	if tableConfig != nil {
 		additionImports := ModelExtractAdditionImports(tableConfig.Additions)
-		requiredImports = append(requiredImports, additionImports...)
+		for _, imp := range additionImports {
+			if !seenImports[imp] {
+				requiredImports = append(requiredImports, imp)
+				seenImports[imp] = true
+			}
+		}
+	}
+
+	// * add imports from sqlc overrides for this table
+	sqlcImports := ModelExtractSqlcOverridesImports(parser, tableName, table)
+	for _, imp := range sqlcImports {
+		if !seenImports[imp] {
+			requiredImports = append(requiredImports, imp)
+			seenImports[imp] = true
+		}
 	}
 
 	// * parse existing structs
@@ -310,6 +325,51 @@ func ModelExtractAdditionImports(additions []*ConfigAddition) []string {
 		if addition.Package != nil && *addition.Package != "" && !seen[*addition.Package] {
 			imports = append(imports, *addition.Package)
 			seen[*addition.Package] = true
+		}
+	}
+
+	return imports
+}
+
+func ModelExtractSqlcOverridesImports(parser *Parser, tableName string, table *Table) []string {
+	var imports []string
+	seen := make(map[string]bool)
+
+	// * check sqlc config for overrides that apply to this table
+	if parser.SqlcConfig != nil && parser.SqlcConfig.SQL != nil {
+		for _, sql := range parser.SqlcConfig.SQL {
+			if sql.Gen.Go != nil && len(sql.Gen.Go.Overrides) > 0 {
+				for _, override := range sql.Gen.Go.Overrides {
+					// * check if this override matches a column in this table
+					if override.Column != "" {
+						// * format: "table.column"
+						if strings.Contains(override.Column, ".") {
+							parts := strings.Split(override.Column, ".")
+							if len(parts) == 2 {
+								overrideTable := strings.TrimSpace(parts[0])
+								_ = strings.TrimSpace(parts[1]) // * overrideColumn - not used but needed for parsing
+								if overrideTable == tableName {
+									// * this override matches our table, check if it requires import
+									if override.GoType.Path != "" || override.GoType.Package != "" {
+										importPath := ""
+										if override.GoType.Path != "" {
+											importPath = override.GoType.Path
+										} else if override.GoType.Package != "" {
+											// * construct path from package name
+											importPath = override.GoType.Package
+										}
+
+										if importPath != "" && !seen[importPath] {
+											imports = append(imports, importPath)
+											seen[importPath] = true
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 

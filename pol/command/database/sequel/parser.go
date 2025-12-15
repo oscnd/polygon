@@ -681,7 +681,7 @@ func (r *Parser) SqlToGoType(sqlType string, notNull bool, columnName string, ta
 
 	// * fallback to default type mapping
 	switch {
-	case strings.Contains(sqlType, "int"):
+	case strings.Contains(sqlType, "int"), strings.Contains(sqlType, "serial"):
 		if strings.HasSuffix(strings.ToLower(columnName), "id") {
 			return "*uint64"
 		}
