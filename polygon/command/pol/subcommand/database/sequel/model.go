@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.scnd.dev/polygon/polygon/util"
+	"go.scnd.dev/open/polygon/utility/form"
 )
 
 func Model(parser *Parser, dirName string) error {
@@ -28,7 +28,7 @@ func Model(parser *Parser, dirName string) error {
 
 func ModelGenerate(tableName string, table *Table, parser *Parser, dirName string) error {
 	// * construct model file paths using singular table name
-	singularTableName := util.ToSingular(tableName)
+	singularTableName := form.ToSingular(tableName)
 	generatedModelDir := filepath.Join("generate", "polygon", "model")
 	generatedModelFile := filepath.Join(generatedModelDir, fmt.Sprintf("%s.%s.go", dirName, singularTableName))
 
@@ -95,7 +95,7 @@ func ModelGenerate(tableName string, table *Table, parser *Parser, dirName strin
 	existingStructs := ModelParseExistingStructs(existingContent)
 
 	// * generate struct name in title case (singular form)
-	structName := util.ToSingularTitleCase(tableName)
+	structName := form.ToSingularTitleCase(tableName)
 
 	// * generate main struct using tableConfig
 	mainStruct := parser.GenerateStruct(structName, table, tableConfig)

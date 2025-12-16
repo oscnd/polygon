@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"go.scnd.dev/polygon/polygon/util"
+	"go.scnd.dev/open/polygon/utility/form"
 )
 
 func QuerierGenerateCreate(connection *Connection, table *Table) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	var columns []string
 	var placeholders []string
@@ -39,7 +39,7 @@ RETURNING *;`,
 }
 
 func QuerierGenerateOne(connection *Connection, table *Table) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	return fmt.Sprintf(`-- name: %sOne :one
 SELECT * FROM %s WHERE %s LIMIT 1;`,
@@ -49,7 +49,7 @@ SELECT * FROM %s WHERE %s LIMIT 1;`,
 }
 
 func QuerierGenerateOneCounted(connection *Connection, table *Table) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	childTables := QuerierGetChildTables(connection, *table.Name)
 	var selectFields []string
@@ -76,7 +76,7 @@ LIMIT 1;`,
 }
 
 func QuerierGenerateManyCounted(connection *Connection, table *Table) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	childTables := QuerierGetChildTables(connection, *table.Name)
 	var selectFields []string
@@ -102,7 +102,7 @@ WHERE %s;`,
 }
 
 func QuerierGenerateMany(connection *Connection, table *Table, tableConfig *QuerierTableConfig) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	return fmt.Sprintf(`-- name: %sMany :many
 SELECT * FROM %s WHERE %s;`,
@@ -112,14 +112,14 @@ SELECT * FROM %s WHERE %s;`,
 }
 
 func QuerierGenerateCount(connection *Connection, table *Table, tableConfig *QuerierTableConfig) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	fkRefs := QuerierGetForeignKeyReferences(table)
 	var whereConditions []string
 
 	// * add filter conditions for parent relations
 	for columnName, refTable := range fkRefs {
-		refEntityName := util.ToSingular(refTable)
+		refEntityName := form.ToSingular(refTable)
 		whereConditions = append(whereConditions, fmt.Sprintf(`(sqlc.narg('%s_ids')::BIGINT[] IS NULL OR %s.%s = ANY(sqlc.narg('%s_ids')::BIGINT[]))`,
 			refEntityName, *table.Name, columnName, refEntityName))
 	}
@@ -152,8 +152,8 @@ FROM %s`,
 }
 
 func QuerierGenerateIncrease(connection *Connection, table *Table, fieldName string) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
-	fieldTitleCase := util.ToPascalCase(fieldName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
+	fieldTitleCase := form.ToPascalCase(fieldName)
 
 	return fmt.Sprintf(`-- name: %s%sIncrease :one
 UPDATE %s
@@ -170,7 +170,7 @@ RETURNING *;`,
 }
 
 func QuerierGenerateList(connection *Connection, table *Table, tableConfig *QuerierTableConfig) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	// * List querier does NOT have joins, only main table
 	var selectFields []string
@@ -208,7 +208,7 @@ func QuerierGenerateList(connection *Connection, table *Table, tableConfig *Quer
 }
 
 func QuerierGenerateUpdate(connection *Connection, table *Table) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	var setConditions []string
 
@@ -242,7 +242,7 @@ RETURNING *;`,
 }
 
 func QuerierGenerateDelete(connection *Connection, table *Table) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	return fmt.Sprintf(`-- name: %sDelete :one
 DELETE FROM %s WHERE %s RETURNING *;`,
@@ -252,7 +252,7 @@ DELETE FROM %s WHERE %s RETURNING *;`,
 }
 
 func QuerierGenerateOneWithJoin(connection *Connection, table *Table, join *ConfigJoin, joinName string) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	// * build SELECT fields and JOINs from join configuration
 	selectFields, joinConditions, _ := QuerierBuildJoinsFromFields(connection, table, join)
@@ -278,7 +278,7 @@ func QuerierGenerateOneWithJoin(connection *Connection, table *Table, join *Conf
 }
 
 func QuerierGenerateManyWithJoin(connection *Connection, table *Table, _ *QuerierTableConfig, join *ConfigJoin, joinName string) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	// * build SELECT fields and JOINs from join configuration
 	selectFields, joinConditions, _ := QuerierBuildJoinsFromFields(connection, table, join)
@@ -304,7 +304,7 @@ func QuerierGenerateManyWithJoin(connection *Connection, table *Table, _ *Querie
 }
 
 func QuerierGenerateListWithJoin(connection *Connection, table *Table, tableConfig *QuerierTableConfig, join *ConfigJoin, joinName string) string {
-	entityTitleCase := util.ToPascalCase(*table.SingularName)
+	entityTitleCase := form.ToPascalCase(*table.SingularName)
 
 	// * build SELECT fields and JOINs from join configuration
 	selectFields, joinConditions, groupByFields := QuerierBuildJoinsFromFields(connection, table, join)

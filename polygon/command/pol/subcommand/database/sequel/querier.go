@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"go.scnd.dev/polygon/polygon/util"
+	"go.scnd.dev/open/polygon/utility/form"
 )
 
 func Querier(parser *Parser, dirName string) error {
@@ -249,14 +249,14 @@ func QuerierGetPrimaryKeyWhereInClause(table *Table, paramIndex int) string {
 	}
 
 	if len(pkColumns) == 1 {
-		paramName := util.ToSnakeCasePlural(pkColumns[0])
+		paramName := form.ToSnakeCasePlural(pkColumns[0])
 		return fmt.Sprintf("%s = ANY(sqlc.narg('%s')::BIGINT[])", pkColumns[0], paramName)
 	}
 
 	// For composite keys, generate separate conditions for each column with named parameters
 	var conditions []string
 	for _, col := range pkColumns {
-		paramName := util.ToSnakeCasePlural(col)
+		paramName := form.ToSnakeCasePlural(col)
 		conditions = append(conditions, fmt.Sprintf("%s = ANY(sqlc.narg('%s')::BIGINT[])", col, paramName))
 	}
 	return strings.Join(conditions, " AND ")
@@ -423,7 +423,7 @@ func QuerierPathToTableNames(fieldPath string, originTable *Table, connection *C
 		}
 
 		// * add table name in title case (keep plural)
-		tableNames = append(tableNames, util.ToPascalCase(referencedTable))
+		tableNames = append(tableNames, form.ToPascalCase(referencedTable))
 		currentTable = nextTable
 	}
 

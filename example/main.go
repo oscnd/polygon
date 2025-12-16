@@ -1,6 +1,6 @@
 package main
 
-import "go.scnd.dev/polygon/polygon"
+import "go.scnd.dev/open/polygon/polygon"
 
 func main() {
 	poly := polygon.Init()
