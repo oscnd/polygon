@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/bsthun/gut"
-	"go.scnd.dev/polygon/polygon/util"
+	"go.scnd.dev/polygon/utility/form"
 )
 
 func ParseMigration(content string, tables map[string]*Table, functions map[string]*Function, triggers map[string]*Trigger) {
@@ -64,7 +64,7 @@ func ParseCreateTable(lines []string, index *int) *Table {
 	}
 
 	tableName := strings.Trim(parts[2], `";`)
-	singularName := util.ToSingular(tableName)
+	singularName := form.ToSingular(tableName)
 	table := &Table{
 		Name:         &tableName,
 		SingularName: &singularName,

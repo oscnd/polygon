@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"go.scnd.dev/polygon/pol/index"
-	"go.scnd.dev/polygon/polygon/util"
+	"go.scnd.dev/polygon/utility/form"
 	"gopkg.in/yaml.v3"
 )
 
@@ -185,7 +185,7 @@ func (r *Generator) InterfaceScanDirectory(scanCfg ScanConfig) ([]InterfaceInfo,
 
 		if len(filteredMethods) > 0 {
 			// * create interface name by replacing {{ structName }} with package name
-			structName := util.ToPascalCase(packageName)
+			structName := form.ToPascalCase(packageName)
 			interfaceName := strings.ReplaceAll(scanCfg.GenerateInterfaceName, "{{ structName }}", structName)
 
 			// * extract required imports from the package directory
@@ -285,7 +285,7 @@ func (r *Generator) InterfaceExtractReceiverMethods(filePath string) ([]MethodIn
 		// * extract parameters
 		var params []string
 		for _, param := range funcDecl.Type.Params.List {
-			paramType := util.ExprToString(param.Type)
+			paramType := form.ExprToString(param.Type)
 			if len(param.Names) > 1 {
 				// * multiple parameters with same type
 				for _, name := range param.Names {
@@ -302,7 +302,7 @@ func (r *Generator) InterfaceExtractReceiverMethods(filePath string) ([]MethodIn
 		var returns []string
 		if funcDecl.Type.Results != nil {
 			for _, result := range funcDecl.Type.Results.List {
-				resultType := util.ExprToString(result.Type)
+				resultType := form.ExprToString(result.Type)
 				if len(result.Names) > 1 {
 					// * multiple named return values with same type
 					for _, name := range result.Names {
@@ -396,7 +396,7 @@ func (r *Generator) InterfaceBindFile() error {
 	_, _ = outputFile.WriteString("type Binder struct {\n")
 	for _, interfaceInfo := range r.Interfaces {
 		// * convert interface name to field name (camelCase)
-		fieldName := util.ToCamelCase(interfaceInfo.Name)
+		fieldName := form.ToCamelCase(interfaceInfo.Name)
 		_, _ = outputFile.WriteString(fmt.Sprintf("\t%s %s\n", fieldName, interfaceInfo.Name))
 	}
 	_, _ = outputFile.WriteString("}\n\n")
@@ -406,7 +406,7 @@ func (r *Generator) InterfaceBindFile() error {
 		// * convert interface name to method name
 		methodName := "Bind" + interfaceInfo.Name
 		// * convert interface name to field name (camelCase)
-		fieldName := util.ToCamelCase(interfaceInfo.Name)
+		fieldName := form.ToCamelCase(interfaceInfo.Name)
 
 		_, _ = outputFile.WriteString(fmt.Sprintf("func (r *Binder) %s(impl %s) {\n", methodName, interfaceInfo.Name))
 		_, _ = outputFile.WriteString(fmt.Sprintf("\tr.%s = impl\n", fieldName))
@@ -418,7 +418,7 @@ func (r *Generator) InterfaceBindFile() error {
 		// * convert interface name to method name
 		methodName := "Get" + interfaceInfo.Name
 		// * convert interface name to field name (camelCase)
-		fieldName := util.ToCamelCase(interfaceInfo.Name)
+		fieldName := form.ToCamelCase(interfaceInfo.Name)
 
 		_, _ = outputFile.WriteString(fmt.Sprintf("func (r *Binder) %s() %s {\n", methodName, interfaceInfo.Name))
 		_, _ = outputFile.WriteString(fmt.Sprintf("\treturn r.%s\n", fieldName))
@@ -486,7 +486,7 @@ func (r *Generator) InterfaceExtractTypesFromInterfaces() map[string]bool {
 				typ := parts[len(parts)-1]
 
 				// * handle built-in types that don't need imports
-				if util.IsBuiltinType(typ) {
+				if form.IsBuiltinType(typ) {
 					continue
 				}
 
