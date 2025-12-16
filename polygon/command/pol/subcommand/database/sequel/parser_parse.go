@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/bsthun/gut"
-	"go.scnd.dev/polygon/utility/form"
+	"go.scnd.dev/open/polygon/utility/form"
 )
 
 func ParseMigration(content string, tables map[string]*Table, functions map[string]*Function, triggers map[string]*Trigger) {

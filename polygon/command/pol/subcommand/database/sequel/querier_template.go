@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"go.scnd.dev/polygon/utility/form"
+	"go.scnd.dev/open/polygon/utility/form"
 )
 
 func QuerierGenerateCreate(connection *Connection, table *Table) string {

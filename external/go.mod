@@ -1,4 +1,4 @@
-module go.scnd.dev/polygon/external
+module go.scnd.dev/open/polygon/external
 
 go 1.25.3
 

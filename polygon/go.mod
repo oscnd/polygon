@@ -1,4 +1,4 @@
-module go.scnd.dev/polygon
+module go.scnd.dev/open/polygon
 
 go 1.25.3
 

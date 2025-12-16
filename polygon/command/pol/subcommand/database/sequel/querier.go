@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"go.scnd.dev/polygon/utility/form"
+	"go.scnd.dev/open/polygon/utility/form"
 )
 
 func Querier(parser *Parser, dirName string) error {

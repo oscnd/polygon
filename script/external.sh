@@ -28,6 +28,6 @@ cp -r -P internal "$EXTERNAL_DIR/sqlc/"
 cd "$EXTERNAL_DIR"
 
 # replace occurrences import path
-find sqlc -name "*.go" -type f -exec sed -i '' 's|github\.com/sqlc-dev/sqlc/internal|go.scnd.dev/polygon/external/sqlc|g' {} +
+find sqlc -name "*.go" -type f -exec sed -i '' 's|github\.com/sqlc-dev/sqlc/internal|go.scnd.dev/open/polygon/external/sqlc|g' {} +
 
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"go.scnd.dev/polygon/package/erroring"
+	"go.scnd.dev/open/polygon/package/erroring"
 )
 
 type Import struct {

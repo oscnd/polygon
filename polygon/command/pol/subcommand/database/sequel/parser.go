@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/bsthun/gut"
-	"go.scnd.dev/polygon/external/sqlc/config"
-	"go.scnd.dev/polygon/external/sqlc/migrations"
-	"go.scnd.dev/polygon/pol/index"
-	"go.scnd.dev/polygon/utility/form"
+	"go.scnd.dev/open/polygon/command/pol/index"
+	"go.scnd.dev/open/polygon/external/sqlc/config"
+	"go.scnd.dev/open/polygon/external/sqlc/migrations"
+	"go.scnd.dev/open/polygon/utility/form"
 	"gopkg.in/yaml.v3"
 )
 

@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"slices"
 
-	"go.scnd.dev/polygon/pol/common/config"
-	"go.scnd.dev/polygon/pol/index"
-	"go.scnd.dev/polygon/pol/subcommand/database/sequel"
-	"go.scnd.dev/polygon/pol/subcommand/inter"
+	"go.scnd.dev/open/polygon/command/pol/common/config"
+	"go.scnd.dev/open/polygon/command/pol/index"
+	"go.scnd.dev/open/polygon/command/pol/subcommand/database/sequel"
+	"go.scnd.dev/open/polygon/command/pol/subcommand/inter"
 )
 
 type App struct {
