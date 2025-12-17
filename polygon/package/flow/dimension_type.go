@@ -1,29 +1,4 @@
-package erroring
-
-import "context"
-
-type Dimension struct {
-	Context    context.Context `json:"context,omitempty"`
-	Scope      *string         `json:"scope,omitempty"`
-	Type       *string         `json:"type,omitempty"`
-	Arguments  map[string]any  `json:"arguments,omitempty"`
-	Parameters map[string]any  `json:"parameters,omitempty"`
-}
-
-func NewDimension(context context.Context, scope string, arguments map[string]any) *Dimension {
-	return &Dimension{
-		Context:    context,
-		Scope:      &scope,
-		Type:       nil,
-		Arguments:  arguments,
-		Parameters: make(map[string]any),
-	}
-}
-
-func (r *Dimension) WithType(dimensionType string) *Dimension {
-	r.Type = &dimensionType
-	return r
-}
+package flow
 
 type DimensionType string
 

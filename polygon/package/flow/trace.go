@@ -1,4 +1,4 @@
-package erroring
+package flow
 
 import (
 	"fmt"

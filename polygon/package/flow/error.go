@@ -1,4 +1,4 @@
-package erroring
+package flow
 
 import (
 	"errors"
@@ -13,10 +13,10 @@ func (r *Error) Error() string {
 }
 
 type ErrorItem struct {
-	Dimension *Dimension `json:"type,omitempty"`
-	Trace     *Trace     `json:"trace,omitempty"`
-	Message   *string    `json:"message,omitempty"`
-	Error     error      `json:"error,omitempty"`
+	Dimensions *Dimension `json:"type,omitempty"`
+	Trace      *Trace     `json:"trace,omitempty"`
+	Message    *string    `json:"message,omitempty"`
+	Error      error      `json:"error,omitempty"`
 }
 
 func NewError(dimension *Dimension, message string, err error) *Error {
@@ -25,10 +25,10 @@ func NewError(dimension *Dimension, message string, err error) *Error {
 		return &Error{
 			Items: []*ErrorItem{
 				{
-					Dimension: dimension,
-					Trace:     trace,
-					Message:   &message,
-					Error:     nil,
+					Dimensions: dimension,
+					Trace:      trace,
+					Message:    &message,
+					Error:      nil,
 				},
 			},
 		}
@@ -37,10 +37,10 @@ func NewError(dimension *Dimension, message string, err error) *Error {
 	var e *Error
 	if errors.As(err, &e) {
 		e.Items = append(e.Items, &ErrorItem{
-			Dimension: dimension,
-			Trace:     trace,
-			Message:   &message,
-			Error:     nil,
+			Dimensions: dimension,
+			Trace:      trace,
+			Message:    &message,
+			Error:      nil,
 		})
 		return e
 	}
@@ -48,10 +48,10 @@ func NewError(dimension *Dimension, message string, err error) *Error {
 	return &Error{
 		Items: []*ErrorItem{
 			{
-				Dimension: dimension,
-				Trace:     trace,
-				Message:   &message,
-				Error:     err,
+				Dimensions: dimension,
+				Trace:      trace,
+				Message:    &message,
+				Error:      err,
 			},
 		},
 	}
