@@ -21,6 +21,7 @@ rm -r "${TEMP_DIR:-}/"!(.git|.gitattributes) || true
 mkdir -p "$TEMP_DIR/external"
 cp -rP "$DIR/external/"!(go.mod|go.sum) "$TEMP_DIR"/external/
 cp -r "$DIR"/polygon/* "$TEMP_DIR"/
+sed -i '/^replace /d' go.mod
 
 # push
 export GOPROXY=direct
