@@ -10,7 +10,6 @@ type Context struct {
 	Scope      *string         `json:"scope,omitempty"`
 	Type       *string         `json:"type,omitempty"`
 	Arguments  map[string]any  `json:"arguments,omitempty"`
-	Parameters map[string]any  `json:"parameters,omitempty"`
 	Dimensions []*Dimension    `json:"-"`
 }
 
@@ -42,10 +41,6 @@ func NewContext(context context.Context, scope string, arguments map[string]any)
 	c.Dimensions = append(c.Dimensions, d)
 
 	return d, e
-}
-
-func (r *Context) Parameter(key string, value any) {
-	r.Parameters[key] = value
 }
 
 func (r *Context) Deadline() (deadline time.Time, ok bool) {

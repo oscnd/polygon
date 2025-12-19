@@ -6,20 +6,16 @@ import (
 )
 
 type Dimension struct {
-	Name      *string    `json:"name,omitempty"`
-	Context   *Context   `json:"context,omitempty"`
-	Trace     *Trace     `json:"trace,omitempty"`
-	Variables any        `json:"variables,omitempty"`
-	Started   *time.Time `json:"started,omitempty"`
-	Ended     *time.Time `json:"ended,omitempty"`
+	Name      *string        `json:"name,omitempty"`
+	Context   *Context       `json:"context,omitempty"`
+	Trace     *Trace         `json:"trace,omitempty"`
+	Variables map[string]any `json:"variables,omitempty"`
+	Started   *time.Time     `json:"started,omitempty"`
+	Ended     *time.Time     `json:"ended,omitempty"`
 }
 
-type DimensionGeneric[T any] struct {
-	*Dimension
-}
-
-func (r *DimensionGeneric[T]) GetVariables() T {
-	return r.Variables.(T)
+func (r *Dimension) Variable(key string, value any) {
+	r.Variables[key] = value
 }
 
 func (r *Dimension) Fork() (*Dimension, func()) {
