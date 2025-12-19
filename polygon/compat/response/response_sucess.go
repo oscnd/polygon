@@ -2,7 +2,7 @@ package response
 
 import (
 	"github.com/bsthun/gut"
-	"github.com/gofiber/fiber/v2"
+	"go.scnd.dev/open/polygon/package/flow"
 )
 
 type SuccessResponse struct {
@@ -19,7 +19,7 @@ type GenericResponse[T any] struct {
 	Data    T       `json:"data,omitempty"`
 }
 
-func Success(c *fiber.Ctx, args1 any, args2 ...any) *SuccessResponse {
+func Success(c *flow.Context, args1 any, args2 ...any) *SuccessResponse {
 	if message, ok := args1.(string); ok {
 		if len(args2) == 0 {
 			return &SuccessResponse{
