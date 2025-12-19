@@ -6,11 +6,11 @@ import (
 
 	"github.com/bsthun/gut"
 	"github.com/go-playground/validator/v10"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"go.scnd.dev/open/polygon/package/flow"
 )
 
-func HandleError(c *fiber.Ctx, err error) error {
+func HandleError(c fiber.Ctx, err error) error {
 	// * construct success
 	success := false
 
