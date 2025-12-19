@@ -1,4 +1,4 @@
-package flow
+package span
 
 import (
 	"errors"
@@ -13,14 +13,14 @@ func (r *Error) Error() string {
 }
 
 type ErrorItem struct {
-	Dimensions *Dimension `json:"type,omitempty"`
-	Trace      *Trace     `json:"trace,omitempty"`
-	Message    *string    `json:"message,omitempty"`
-	Error      error      `json:"error,omitempty"`
+	Dimensions *Span   `json:"type,omitempty"`
+	Trace      *Caller `json:"trace,omitempty"`
+	Message    *string `json:"message,omitempty"`
+	Error      error   `json:"error,omitempty"`
 }
 
-func NewError(dimension *Dimension, message string, err error) *Error {
-	trace := NewTrace(2)
+func NewError(dimension *Span, message string, err error) *Error {
+	trace := NewCaller(2)
 	if err == nil {
 		return &Error{
 			Items: []*ErrorItem{

@@ -2,7 +2,7 @@ package response
 
 import (
 	"github.com/bsthun/gut"
-	"go.scnd.dev/open/polygon/package/flow"
+	"go.scnd.dev/open/polygon/package/span"
 )
 
 type SuccessResponse struct {
@@ -19,7 +19,7 @@ type GenericResponse[T any] struct {
 	Data    T       `json:"data,omitempty"`
 }
 
-func Success(d *flow.Dimension, args1 any, args2 ...any) *SuccessResponse {
+func Success(s *span.Span, args1 any, args2 ...any) *SuccessResponse {
 	if message, ok := args1.(string); ok {
 		if len(args2) == 0 {
 			return &SuccessResponse{

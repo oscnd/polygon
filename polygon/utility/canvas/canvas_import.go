@@ -3,7 +3,7 @@ package canvas
 import (
 	"strings"
 
-	"go.scnd.dev/open/polygon/package/flow"
+	"go.scnd.dev/open/polygon/package/span"
 )
 
 type Import struct {
@@ -18,7 +18,7 @@ type ImportItem struct {
 func (r *Import) AddImport(item *ImportItem) error {
 	// * construct error dimension
 	if item.Path == nil {
-		return flow.NewError(nil, "path is nil", nil)
+		return span.NewError(nil, "path is nil", nil)
 	}
 	if item.Alias == nil {
 		segments := strings.Split(*item.Path, "/")
@@ -26,7 +26,7 @@ func (r *Import) AddImport(item *ImportItem) error {
 	}
 	for _, existing := range r.Imports {
 		if *existing.Alias == *item.Alias {
-			return flow.NewError(nil, "import alias already exists", nil)
+			return span.NewError(nil, "import alias already exists", nil)
 		}
 	}
 	r.Imports = append(r.Imports, item)

@@ -1,4 +1,4 @@
-package flow
+package span
 
 type DimensionType string
 

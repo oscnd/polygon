@@ -1,30 +1,32 @@
-package flow
+package span
 
 import (
 	"fmt"
 	"time"
 )
 
-type Dimension struct {
+type Span struct {
 	Name      *string        `json:"name,omitempty"`
+	Layer     *string        `json:"layer,omitempty"`
 	Context   *Context       `json:"context,omitempty"`
-	Trace     *Trace         `json:"trace,omitempty"`
+	Trace     *Caller        `json:"trace,omitempty"`
 	Variables map[string]any `json:"variables,omitempty"`
 	Started   *time.Time     `json:"started,omitempty"`
 	Ended     *time.Time     `json:"ended,omitempty"`
 }
 
-func (r *Dimension) Variable(key string, value any) {
+func (r *Span) Variable(key string, value any) {
 	r.Variables[key] = value
 }
 
-func (r *Dimension) Fork() (*Dimension, func()) {
-	trace := NewTrace(2)
+func (r *Span) Fork(layer string) *Span {
+	trace := NewCaller(2)
 	traceStr := trace.String()
 	name := fmt.Sprintf("%s/%s", *r.Name, traceStr)
 	now := time.Now()
-	d2 := &Dimension{
+	d2 := &Span{
 		Name:      &name,
+		Layer:     &layer,
 		Context:   r.Context,
 		Trace:     trace,
 		Variables: nil,
@@ -32,11 +34,11 @@ func (r *Dimension) Fork() (*Dimension, func()) {
 		Ended:     nil,
 	}
 
-	f := func() {
-		end := time.Now()
-		d2.Ended = &end
-	}
+	r.Context.Spans = append(r.Context.Spans, d2)
+	return d2
+}
 
-	r.Context.Dimensions = append(r.Context.Dimensions, d2)
-	return d2, f
+func (r *Span) End() {
+	end := time.Now()
+	r.Ended = &end
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/bsthun/gut"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
-	"go.scnd.dev/open/polygon/package/flow"
+	"go.scnd.dev/open/polygon/package/span"
 )
 
 func HandleError(c fiber.Ctx, err error) error {
@@ -23,29 +23,29 @@ func HandleError(c fiber.Ctx, err error) error {
 		})
 	}
 
-	// * case of `*flow.Error`
-	var polygonError *flow.Error
-	if errors.As(err, &polygonError) {
-		if polygonError.Items[0].Error != nil {
-			estr := polygonError.Items[0].Error.Error()
+	// * case of `*span.Error`
+	var spanError *span.Error
+	if errors.As(err, &spanError) {
+		if spanError.Items[0].Error != nil {
+			estr := spanError.Items[0].Error.Error()
 			return c.Status(fiber.StatusBadRequest).JSON(&ErrorResponse{
 				Success: &success,
-				Message: polygonError.Items[0].Message,
+				Message: spanError.Items[0].Message,
 				Error:   &estr,
 			})
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(&ErrorResponse{
 			Success: gut.Ptr(false),
-			Message: polygonError.Items[0].Message,
+			Message: spanError.Items[0].Message,
 			Error:   nil,
 		})
 	}
 
 	// * case of `validator.ValidationErrors`
-	var valErr validator.ValidationErrors
-	if errors.As(err, &valErr) {
+	var validatorErr validator.ValidationErrors
+	if errors.As(err, &validatorErr) {
 		var lists []string
-		for _, err := range valErr {
+		for _, err := range validatorErr {
 			lists = append(lists, err.Field()+" ("+err.Tag()+")")
 		}
 
@@ -54,7 +54,7 @@ func HandleError(c fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusBadRequest).JSON(&ErrorResponse{
 			Success: gut.Ptr(false),
 			Message: gut.Ptr("validation failed on " + message),
-			Error:   gut.Ptr(valErr.Error()),
+			Error:   gut.Ptr(validatorErr.Error()),
 		})
 	}
 
