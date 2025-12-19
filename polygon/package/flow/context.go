@@ -14,7 +14,7 @@ type Context struct {
 	Dimensions []*Dimension    `json:"-"`
 }
 
-func NewContext(context context.Context, scope string, arguments map[string]any) (*Context, *Dimension, func()) {
+func NewContext(context context.Context, scope string, arguments map[string]any) (*Dimension, func()) {
 	c := &Context{
 		Context:    context,
 		Scope:      &scope,
@@ -35,15 +35,31 @@ func NewContext(context context.Context, scope string, arguments map[string]any)
 		Ended:     nil,
 	}
 
-	f := func() {
+	e := func() {
 		// TODO: implement cleanup
 	}
 
 	c.Dimensions = append(c.Dimensions, d)
 
-	return c, d, f
+	return d, e
 }
 
 func (r *Context) Parameter(key string, value any) {
 	r.Parameters[key] = value
+}
+
+func (r *Context) Deadline() (deadline time.Time, ok bool) {
+	return r.Context.Deadline()
+}
+
+func (r *Context) Done() <-chan struct{} {
+	return r.Context.Done()
+}
+
+func (r *Context) Err() error {
+	return r.Context.Err()
+}
+
+func (r *Context) Value(key any) any {
+	return r.Context.Value(key)
 }

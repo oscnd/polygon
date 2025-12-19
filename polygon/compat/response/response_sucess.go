@@ -19,7 +19,7 @@ type GenericResponse[T any] struct {
 	Data    T       `json:"data,omitempty"`
 }
 
-func Success(c *flow.Context, args1 any, args2 ...any) *SuccessResponse {
+func Success(d *flow.Dimension, args1 any, args2 ...any) *SuccessResponse {
 	if message, ok := args1.(string); ok {
 		if len(args2) == 0 {
 			return &SuccessResponse{
