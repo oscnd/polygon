@@ -1,4 +1,4 @@
-package erroring
+package span
 
 import (
 	"fmt"
@@ -6,16 +6,16 @@ import (
 	"strings"
 )
 
-type Trace struct {
+type Caller struct {
 	Name *string
 	Line *int
 }
 
-func (r *Trace) String() string {
+func (r *Caller) String() string {
 	return fmt.Sprintf("%s:%d", *r.Name, *r.Line)
 }
 
-func NewTrace(skip int) *Trace {
+func NewCaller(skip int) *Caller {
 	pc, _, line, ok := runtime.Caller(skip + 1)
 	if !ok {
 		panic("no caller information")
@@ -23,7 +23,7 @@ func NewTrace(skip int) *Trace {
 	name := runtime.FuncForPC(pc).Name()
 	name = name[strings.LastIndex(name, "/")+1:]
 
-	return &Trace{
+	return &Caller{
 		Name: &name,
 		Line: &line,
 	}

@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"go.scnd.dev/open/polygon/command/pol/index"
+	"go.scnd.dev/open/polygon/command/polygon/index"
 )
 
 func Schema(app index.App) error {

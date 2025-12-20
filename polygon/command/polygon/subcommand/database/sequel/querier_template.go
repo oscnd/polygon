@@ -189,7 +189,29 @@ func QuerierGenerateList(connection *Connection, table *Table, tableConfig *Quer
 		whereClause = "WHERE " + strings.Join(whereConditions, "\n  AND ")
 	}
 
-	// * build final query without ORDER BY
+	// * build ORDER BY clause based on sort fields with dynamic sorting
+	var orderByClause string
+	if len(tableConfig.SortableFields) > 0 {
+		var orderConditions []string
+		for _, field := range tableConfig.SortableFields {
+			// * add CASE statements for dynamic sorting with configurable direction
+			orderConditions = append(orderConditions, fmt.Sprintf(`CASE WHEN sqlc.narg('sort') = '%s' AND COALESCE(sqlc.narg('order'), 'asc') = 'asc' THEN %s.%s END`,
+				field, *table.Name, field))
+			orderConditions = append(orderConditions, fmt.Sprintf(`CASE WHEN sqlc.narg('sort') = '%s' AND sqlc.narg('order') = 'desc' THEN %s.%s END DESC`,
+				field, *table.Name, field))
+		}
+
+		// * add default sort by first sortable field if no sort parameter provided
+		if len(tableConfig.SortableFields) > 0 {
+			firstField := tableConfig.SortableFields[0]
+			orderConditions = append(orderConditions, fmt.Sprintf(`CASE WHEN sqlc.narg('sort') IS NULL THEN %s.%s END`,
+				*table.Name, firstField))
+		}
+
+		orderByClause = "ORDER BY " + strings.Join(orderConditions, ",\n      ")
+	}
+
+	// * build final query
 	var query strings.Builder
 	query.WriteString(fmt.Sprintf("-- name: %sList :many\n", entityTitleCase))
 	query.WriteString("SELECT ")
@@ -199,6 +221,11 @@ func QuerierGenerateList(connection *Connection, table *Table, tableConfig *Quer
 	if whereClause != "" {
 		query.WriteString("\n")
 		query.WriteString(whereClause)
+	}
+
+	if orderByClause != "" {
+		query.WriteString("\n")
+		query.WriteString(orderByClause)
 	}
 
 	query.WriteString("\nLIMIT sqlc.narg('limit')::BIGINT")
@@ -325,12 +352,34 @@ func QuerierGenerateListWithJoin(connection *Connection, table *Table, tableConf
 		whereClause = "WHERE " + strings.Join(whereConditions, "\n  AND ")
 	}
 
+	// * build ORDER BY clause based on sort fields
+	var orderByClause string
+	if len(tableConfig.SortableFields) > 0 {
+		var orderConditions []string
+		for _, field := range tableConfig.SortableFields {
+			// * add CASE statements for dynamic sorting with configurable direction
+			orderConditions = append(orderConditions, fmt.Sprintf(`CASE WHEN sqlc.narg('sort') = '%s' AND COALESCE(sqlc.narg('order'), 'asc') = 'asc' THEN %s.%s END`,
+				field, *table.Name, field))
+			orderConditions = append(orderConditions, fmt.Sprintf(`CASE WHEN sqlc.narg('sort') = '%s' AND sqlc.narg('order') = 'desc' THEN %s.%s END DESC`,
+				field, *table.Name, field))
+		}
+
+		// * add default sort by first sortable field if no sort parameter provided
+		if len(tableConfig.SortableFields) > 0 {
+			firstField := tableConfig.SortableFields[0]
+			orderConditions = append(orderConditions, fmt.Sprintf(`CASE WHEN sqlc.narg('sort') IS NULL THEN %s.%s END`,
+				*table.Name, firstField))
+		}
+
+		orderByClause = "ORDER BY " + strings.Join(orderConditions, ",\n      ")
+	}
+
 	// * build GROUP BY
 	if len(groupByFields) == 0 {
 		groupByFields = []string{fmt.Sprintf("%s.id", *table.Name)}
 	}
 
-	// * build final query without ORDER BY
+	// * build final query
 	var query strings.Builder
 	query.WriteString(fmt.Sprintf("-- name: %sList%s :many\n", entityTitleCase, joinName))
 	query.WriteString("SELECT ")
@@ -350,6 +399,11 @@ func QuerierGenerateListWithJoin(connection *Connection, table *Table, tableConf
 	if len(groupByFields) > 1 {
 		query.WriteString("\nGROUP BY ")
 		query.WriteString(strings.Join(groupByFields, ", "))
+	}
+
+	if orderByClause != "" {
+		query.WriteString("\n")
+		query.WriteString(orderByClause)
 	}
 
 	query.WriteString("\nLIMIT sqlc.narg('limit')::BIGINT")
