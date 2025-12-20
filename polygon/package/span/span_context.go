@@ -3,17 +3,21 @@ package span
 import (
 	"context"
 	"time"
+
+	"go.scnd.dev/open/polygon/core"
 )
 
 type Context struct {
-	Context   context.Context `json:"context,omitempty"`
-	Type      *string         `json:"type,omitempty"`
-	Arguments map[string]any  `json:"arguments,omitempty"`
-	Spans     []*Span         `json:"-"`
+	Internal  *core.Internal
+	Context   context.Context
+	Type      *string
+	Arguments map[string]any
+	Spans     []*Span
 }
 
-func NewContext(context context.Context, layer string, arguments map[string]any) *Span {
+func NewContext(internal *core.Internal, context context.Context, layer string, arguments map[string]any) *Span {
 	c := &Context{
+		Internal:  internal,
 		Context:   context,
 		Type:      nil,
 		Arguments: arguments,
