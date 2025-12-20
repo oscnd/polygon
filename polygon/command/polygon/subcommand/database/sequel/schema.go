@@ -55,13 +55,6 @@ func Schema(app index.App) error {
 		log.Printf("Error applying type replacements: %v", err)
 		return fmt.Errorf("failed to apply type replacements: %w", err)
 	}
-
-	// * replace DBTX and Querier in psql files
-	if err := ReplaceDBTXAndQuerier(parser); err != nil {
-		log.Printf("Error replacing DBTX and Querier: %v", err)
-		return fmt.Errorf("failed to replace DBTX and Querier: %w", err)
-	}
-
 	return nil
 }
 

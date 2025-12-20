@@ -1,7 +1,6 @@
 package sequel
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,6 +41,12 @@ func ReplaceGeneratedTypes(parser *Parser) error {
 
 			if err != nil {
 				return fmt.Errorf("error processing directory %s: %w", outputDir, err)
+			}
+
+			interfaceFileTemplate := "package %s\n\nimport (\n\t\"context\"\n\t\"database/sql\"\n)\n\ntype Database interface {\n\tP() Querier\n\tPtx(context context.Context, opts *sql.TxOptions) (DatabaseTx, Querier)\n}\n\ntype DatabaseTx interface {\n\tCommit() error\n\tRollback() error\n}\n"
+			interfaceFileContent := fmt.Sprintf(interfaceFileTemplate, filepath.Base(outputDir))
+			if err := os.WriteFile(filepath.Join(outputDir, "interface.go"), []byte(interfaceFileContent), 0644); err != nil {
+				return fmt.Errorf("failed to write interface.go: %w", err)
 			}
 		}
 	}
@@ -132,72 +137,4 @@ func WriteFileReplaced(filePath string, lines []string) error {
 	}
 
 	return nil
-}
-
-// ReplaceDBTXAndQuerier replaces DBTX with PDBTX and Querier with PQuerier in psql files
-func ReplaceDBTXAndQuerier(parser *Parser) error {
-	// Get the output directory from sqlc config
-	if parser.SqlcConfig == nil || len(parser.SqlcConfig.SQL) == 0 {
-		return fmt.Errorf("no sqlc configuration found")
-	}
-
-	for _, sql := range parser.SqlcConfig.SQL {
-		if sql.Gen.Go != nil && sql.Gen.Go.Out != "" {
-			outputDir := sql.Gen.Go.Out
-
-			// Only process files in psql directory
-			if !strings.Contains(outputDir, "psql") {
-				continue
-			}
-
-			// Walk through all generated Go files in the output directory
-			err := filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-
-				// Only process .go files
-				if !strings.HasSuffix(path, ".go") {
-					return nil
-				}
-
-				return ReplaceFileDBTXQuerier(path)
-			})
-
-			if err != nil {
-				return fmt.Errorf("error processing directory %s: %w", outputDir, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-// ReplaceFileDBTXQuerier replaces DBTX with PDBTX and Querier with PQuerier in a single file
-func ReplaceFileDBTXQuerier(filePath string) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", filePath, err)
-	}
-	defer file.Close()
-
-	var lines []string
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Apply replacements
-		line = strings.ReplaceAll(line, "DBTX", "PDBTX")
-		line = strings.ReplaceAll(line, "Querier", "PQuerier")
-
-		lines = append(lines, line)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading file %s: %w", filePath, err)
-	}
-
-	// Write the modified content back
-	return WriteFileReplaced(filePath, lines)
 }

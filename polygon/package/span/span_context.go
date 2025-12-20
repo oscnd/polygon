@@ -4,18 +4,18 @@ import (
 	"context"
 	"time"
 
-	"go.scnd.dev/open/polygon/core"
+	"go.scnd.dev/open/polygon"
 )
 
 type Context struct {
-	Internal  *core.Internal
+	Internal  *polygon.Internal
 	Context   context.Context
 	Type      *string
 	Arguments map[string]any
 	Spans     []*Span
 }
 
-func NewContext(internal *core.Internal, context context.Context, layer string, arguments map[string]any) *Span {
+func NewContext(internal *polygon.Internal, context context.Context, layer string, arguments map[string]any) *Span {
 	c := &Context{
 		Internal:  internal,
 		Context:   context,

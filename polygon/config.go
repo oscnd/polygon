@@ -1,4 +1,4 @@
-package core
+package polygon
 
 import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"

@@ -38,6 +38,10 @@ func (r *Span) Fork(layer string) *Span {
 	return d2
 }
 
+func (r *Span) Error(message string, err error) error {
+	return NewError(r, message, err)
+}
+
 func (r *Span) End() {
 	end := time.Now()
 	r.Ended = &end
