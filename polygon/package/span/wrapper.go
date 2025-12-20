@@ -1,13 +1,21 @@
 package span
 
-import "go.scnd.dev/open/polygon"
+import (
+	"context"
+
+	"go.scnd.dev/open/polygon"
+)
 
 type Wrapper struct {
 	Span *Span `json:"span"`
 }
 
-func (r *Wrapper) Context() polygon.SpanContext {
+func (r *Wrapper) Context() context.Context {
 	return r.Span.Context
+}
+
+func (r *Wrapper) SetContext(context context.Context) {
+	r.Span.Context.Context = context
 }
 
 func (r *Wrapper) Variable(key string, value any) {

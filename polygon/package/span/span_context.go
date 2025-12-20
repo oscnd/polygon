@@ -4,39 +4,44 @@ import (
 	"context"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.scnd.dev/open/polygon"
 )
 
 type Context struct {
-	Internal  *polygon.Internal
+	Polygon   polygon.Polygon
 	Context   context.Context
 	Type      *string
 	Arguments map[string]any
 	Spans     []*Span
 }
 
-func NewContext(internal *polygon.Internal, context context.Context, layer string, arguments map[string]any) *Span {
+func NewContext(polygon polygon.Polygon, context context.Context, name string, layer string, arguments map[string]any) *Span {
 	c := &Context{
-		Internal:  internal,
+		Polygon:   polygon,
 		Context:   context,
 		Type:      nil,
 		Arguments: arguments,
 		Spans:     make([]*Span, 0),
 	}
 
-	trace := NewCaller(2)
-	traceStr := trace.String()
+	caller := NewCaller(2)
 	now := time.Now()
-	s := &Span{
-		Name:      &traceStr,
-		Layer:     &layer,
-		Context:   c,
-		Trace:     trace,
-		Variables: nil,
-		Started:   &now,
-		Ended:     nil,
-	}
 
+	ctx, span := polygon.Tracer().Start(context, name)
+	span.SetAttributes(attribute.String("span.layer", layer))
+	span.SetAttributes(attribute.String("span.caller", caller.String()))
+
+	s := &Span{
+		Name:           &name,
+		Layer:          &layer,
+		Context:        c,
+		Caller:         caller,
+		Variables:      nil,
+		Started:        &now,
+		Ended:          nil,
+		TracingContext: ctx,
+	}
 	c.Spans = append(c.Spans, s)
 
 	return s
