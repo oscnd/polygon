@@ -23,6 +23,7 @@ type Span struct {
 
 func (r *Span) Variable(key string, value any) {
 	r.Variables[key] = value
+	r.TracingSpan.SetAttributes(attribute.String(fmt.Sprintf("var.%s", key), fmt.Sprintf("%v", value)))
 }
 
 func (r *Span) Fork(layer string) *Span {
@@ -53,6 +54,10 @@ func (r *Span) Fork(layer string) *Span {
 
 func (r *Span) Error(message string, err error) error {
 	return NewError(r, message, err)
+}
+
+func (r *Span) Tracing() trace.Span {
+	return r.TracingSpan
 }
 
 func (r *Span) End() {

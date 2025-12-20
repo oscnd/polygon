@@ -28,9 +28,9 @@ func NewContext(polygon polygon.Polygon, context context.Context, name string, l
 	caller := NewCaller(2)
 	now := time.Now()
 
-	ctx, span := polygon.Tracer().Start(context, name)
-	span.SetAttributes(attribute.String("span.layer", layer))
-	span.SetAttributes(attribute.String("span.caller", caller.String()))
+	tracingContext, tracingSpan := polygon.Tracer().Start(context, name)
+	tracingSpan.SetAttributes(attribute.String("span.layer", layer))
+	tracingSpan.SetAttributes(attribute.String("span.caller", caller.String()))
 
 	s := &Span{
 		Name:           &name,
@@ -40,7 +40,8 @@ func NewContext(polygon polygon.Polygon, context context.Context, name string, l
 		Variables:      nil,
 		Started:        &now,
 		Ended:          nil,
-		TracingContext: ctx,
+		TracingSpan:    tracingSpan,
+		TracingContext: tracingContext,
 	}
 	c.Spans = append(c.Spans, s)
 

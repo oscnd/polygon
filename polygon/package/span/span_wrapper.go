@@ -2,6 +2,7 @@ package span
 
 import (
 	"context"
+	"time"
 
 	"go.scnd.dev/open/polygon"
 )
@@ -16,6 +17,10 @@ func (r *Wrapper) Context() context.Context {
 
 func (r *Wrapper) SetContext(context context.Context) {
 	r.Span.Context.Context = context
+}
+
+func (r *Wrapper) Started() *time.Time {
+	return r.Span.Started
 }
 
 func (r *Wrapper) Variable(key string, value any) {

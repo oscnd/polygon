@@ -1,14 +1,15 @@
-package trace
+package telemetry
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"go.opentelemetry.io/otel/attribute"
 	"go.scnd.dev/open/polygon/package/span"
 )
 
-func (r *Trace) Middleware() fiber.Handler {
+func (r *Telemetry) Middleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		name := fmt.Sprintf("HTTP %s %s", c.Method(), c.OriginalURL())
 		s := &span.Wrapper{
@@ -29,9 +30,15 @@ func (r *Trace) Middleware() fiber.Handler {
 			attribute.String("http.user_agent", c.Get("User-Agent")),
 		)
 
+		// * count metric
+		r.Instrument.HttpActiveRequestCounter(context, 1, c.OriginalURL())
+		defer r.Instrument.HttpActiveRequestCounter(context, -1, c.OriginalURL())
+
 		// * proceed to next
 		err := c.Next()
 
+		// * count metric
+		r.Instrument.HttpDurationRecord(context, time.Now().Sub(*s.Started()).Milliseconds(), c.OriginalURL(), c.Response().StatusCode())
 		traceSpan.SetAttributes(attribute.Int("http.status_code", c.Response().StatusCode()))
 		return err
 	}

@@ -7,21 +7,21 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.scnd.dev/open/polygon"
 	"go.scnd.dev/open/polygon/package/span"
-	"go.scnd.dev/open/polygon/package/trace"
+	"go.scnd.dev/open/polygon/package/telemetry"
 )
 
 type Instance struct {
-	config *polygon.Config
-	trace  *trace.Trace
+	config    *polygon.Config
+	telemetry *telemetry.Telemetry
 }
 
 func New(config *polygon.Config) (_ polygon.Polygon, err error) {
 	i := &Instance{
-		config: config,
-		trace:  nil,
+		config:    config,
+		telemetry: nil,
 	}
 
-	i.trace, err = trace.New(i)
+	i.telemetry, err = telemetry.New(i)
 	if err != nil {
 		return nil, err
 	}
@@ -40,9 +40,13 @@ func (r *Instance) Span(context context.Context, name string, layer string, argu
 }
 
 func (r *Instance) Tracer() oteltrace.Tracer {
-	return r.trace.Tracer
+	return r.telemetry.Tracer
 }
 
 func (r *Instance) TracerMiddleware() fiber.Handler {
-	return r.trace.Middleware()
+	return r.telemetry.Middleware()
+}
+
+func (r *Instance) Instrument() polygon.Instrument {
+	return r.telemetry.Instrument
 }

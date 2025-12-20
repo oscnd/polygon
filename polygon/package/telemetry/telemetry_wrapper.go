@@ -1,4 +1,4 @@
-package trace
+package telemetry
 
 import (
 	"github.com/gofiber/fiber/v3"
@@ -6,7 +6,7 @@ import (
 )
 
 type Wrapper struct {
-	Trace *Trace
+	Trace *Telemetry
 }
 
 func (r *Wrapper) Tracer() trace.Tracer {

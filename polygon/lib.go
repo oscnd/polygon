@@ -11,5 +11,6 @@ type Polygon interface {
 	Config() *Config
 	Tracer() trace.Tracer
 	TracerMiddleware() fiber.Handler
+	Instrument() Instrument
 	Span(context context.Context, name, layer string, arguments map[string]any) Span
 }
