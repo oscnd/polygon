@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.scnd.dev/open/polygon/command/pol/index"
+	"go.scnd.dev/open/polygon/command/polygon/index"
 	"go.scnd.dev/open/polygon/utility/form"
 	"gopkg.in/yaml.v3"
 )
