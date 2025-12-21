@@ -6,8 +6,8 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -73,10 +73,13 @@ func New(polygon polygon.Polygon) (_ *Telemetry, err error) {
 
 func NewMeter(telemetry *Telemetry, res *resource.Resource) (metric.Meter, error) {
 	// * construct exporter
-	exporter, err := otlpmetrichttp.New(
+	exporter, err := otlpmetricgrpc.New(
 		context.Background(),
-		otlpmetrichttp.WithEndpoint(*telemetry.Polygon.Config().TraceUrl),
-		otlpmetrichttp.WithInsecure(),
+		otlpmetricgrpc.WithEndpoint(*telemetry.Polygon.Config().TelemetryUrl),
+		otlpmetricgrpc.WithHeaders(map[string]string{
+			"X-Scope-OrgID": *telemetry.Polygon.Config().TelemetryOrganization,
+		}),
+		otlpmetricgrpc.WithInsecure(),
 	)
 	if err != nil {
 		return nil, span.NewError(nil, "unable to initialize metric exporter", err)
@@ -100,10 +103,13 @@ func NewMeter(telemetry *Telemetry, res *resource.Resource) (metric.Meter, error
 
 func NewTracer(telemetry *Telemetry, res *resource.Resource) (trace.Tracer, error) {
 	// * construct exporter
-	exporter, err := otlptracehttp.New(
+	exporter, err := otlptracegrpc.New(
 		context.Background(),
-		otlptracehttp.WithEndpoint(*telemetry.Polygon.Config().TraceUrl),
-		otlptracehttp.WithInsecure(),
+		otlptracegrpc.WithEndpoint(*telemetry.Polygon.Config().TelemetryUrl),
+		otlptracegrpc.WithHeaders(map[string]string{
+			"X-Scope-OrgID": *telemetry.Polygon.Config().TelemetryOrganization,
+		}),
+		otlptracegrpc.WithInsecure(),
 	)
 	if err != nil {
 		return nil, span.NewError(nil, "unable to intialize exporter", err)
