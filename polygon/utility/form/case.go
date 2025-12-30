@@ -5,7 +5,7 @@ import (
 	"unicode"
 )
 
-func Parser(s string) []string {
+func CaseParser(s string) []string {
 	if s == "" {
 		return []string{}
 	}
@@ -45,7 +45,7 @@ func Parser(s string) []string {
 
 // ToCamelCase converts a string to camel case
 func ToCamelCase(s string) string {
-	segments := Parser(s)
+	segments := CaseParser(s)
 	if len(segments) == 0 {
 		return s
 	}
@@ -65,7 +65,7 @@ func ToCamelCase(s string) string {
 
 // ToPascalCase converts a string to pascal case
 func ToPascalCase(s string) string {
-	segments := Parser(s)
+	segments := CaseParser(s)
 	if len(segments) == 0 {
 		return s
 	}
@@ -83,7 +83,7 @@ func ToPascalCase(s string) string {
 
 // ToSnakeCase converts a string to snake case
 func ToSnakeCase(s string) string {
-	segments := Parser(s)
+	segments := CaseParser(s)
 	if len(segments) == 0 {
 		return s
 	}
@@ -93,7 +93,7 @@ func ToSnakeCase(s string) string {
 
 // ToSnakeCasePlural converts a string to snake case plural form
 func ToSnakeCasePlural(s string) string {
-	segments := Parser(s)
+	segments := CaseParser(s)
 	if len(segments) == 0 {
 		return s
 	}
@@ -101,7 +101,7 @@ func ToSnakeCasePlural(s string) string {
 	// * make the last segment plural
 	if len(segments) > 0 {
 		lastSeg := segments[len(segments)-1]
-		segments[len(segments)-1] = pluralize(lastSeg)
+		segments[len(segments)-1] = CasePluralize(lastSeg)
 	}
 
 	return strings.Join(segments, "_")
@@ -109,7 +109,7 @@ func ToSnakeCasePlural(s string) string {
 
 // ToSingular converts a string to singular form
 func ToSingular(s string) string {
-	segments := Parser(s)
+	segments := CaseParser(s)
 	if len(segments) == 0 {
 		return s
 	}
@@ -117,7 +117,7 @@ func ToSingular(s string) string {
 	// Make the last segment singular
 	if len(segments) > 0 {
 		lastSeg := segments[len(segments)-1]
-		segments[len(segments)-1] = singularize(lastSeg)
+		segments[len(segments)-1] = CaseSingularize(lastSeg)
 	}
 
 	return strings.Join(segments, "_")
@@ -129,8 +129,8 @@ func ToSingularTitleCase(s string) string {
 	return ToPascalCase(singular)
 }
 
-// pluralize makes a word plural
-func pluralize(word string) string {
+// CasePluralize makes a word plural
+func CasePluralize(word string) string {
 	if word == "" {
 		return word
 	}
@@ -152,8 +152,8 @@ func pluralize(word string) string {
 	}
 }
 
-// singularize makes a word singular
-func singularize(word string) string {
+// CaseSingularize makes a word singular
+func CaseSingularize(word string) string {
 	if word == "" {
 		return word
 	}

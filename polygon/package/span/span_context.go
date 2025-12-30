@@ -37,7 +37,7 @@ func NewContext(polygon polygon.Polygon, context context.Context, name string, l
 		Layer:          &layer,
 		Context:        c,
 		Caller:         caller,
-		Variables:      nil,
+		Variables:      make(map[string]any),
 		Started:        &now,
 		Ended:          nil,
 		TracingSpan:    tracingSpan,

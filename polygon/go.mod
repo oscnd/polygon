@@ -7,6 +7,7 @@ require (
 	github.com/go-playground/validator/v10 v10.29.0
 	github.com/gofiber/fiber/v3 v3.0.0-rc.3
 	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/lithammer/dedent v1.1.0
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.39.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.39.0

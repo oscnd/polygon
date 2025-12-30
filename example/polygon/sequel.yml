@@ -28,7 +28,7 @@ connections:
                     - name: content
                       include: base
                     - name: created_at
-                      include: base
+                      include: none
                     - name: updated_at
                       include: base
                 additions: []
@@ -74,14 +74,14 @@ connections:
                       include: base
                 additions: []
                 joins:
-                  - type: parented
-                    table: post_reactions
-                    fields:
-                      - profile_id
-                      - profile_id.user_id
-                      - post_id
-                      - post_id.profile_id
-                      - post_id.profile_id.user_id
+                    - type: parented
+                      table: post_reactions
+                      fields:
+                        - profile_id
+                        - profile_id.user_id
+                        - post_id
+                        - post_id.profile_id
+                        - post_id.profile_id.user_id
             posts:
                 fields:
                     - name: id

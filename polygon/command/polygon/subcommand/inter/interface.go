@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"go.scnd.dev/open/polygon/command/polygon/index"
+	"go.scnd.dev/open/polygon/utility/code"
 	"go.scnd.dev/open/polygon/utility/form"
 	"gopkg.in/yaml.v3"
 )
@@ -206,6 +207,9 @@ func (r *Generator) InterfaceScanDirectory(scanCfg ScanConfig) ([]InterfaceInfo,
 func (r *Generator) InterfaceExtractImportsFromFiles(packagePath string) map[string]string {
 	imports := make(map[string]string)
 
+	// * first, build a mapping of import paths to actual package names
+	importPathToPkgName := make(map[string]string)
+
 	err := filepath.Walk(packagePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -216,27 +220,36 @@ func (r *Generator) InterfaceExtractImportsFromFiles(packagePath string) map[str
 			return nil
 		}
 
-		// * parse the Go file
+		// * parse the Go file to get both imports and package name
 		fset := token.NewFileSet()
-		node, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		node, err := parser.ParseFile(fset, path, nil, parser.PackageClauseOnly|parser.ImportsOnly)
 		if err != nil {
 			return nil // skip files that can't be parsed
 		}
 
-		// * extract all imports
+		// * extract package name
+		if node.Name != nil {
+			pkgName := node.Name.Name
+			importPathToPkgName[pkgName] = pkgName
+		}
+
+		// * extract all imports and map to their actual package names
 		for _, imp := range node.Imports {
 			// * remove quotes from import path
 			importPath := strings.Trim(imp.Path.Value, `"`)
 
-			// * determine alias
+			// * determine the actual package name from the imported package
+			// * we need to read the package's source files to get the real package name
+			pkgName := r.getPackageNameFromImportPath(importPath)
+
+			// * determine alias (for imports with explicit aliases)
 			var alias string
 			if imp.Name != nil {
 				// * explicit alias (e.g., `import alias "path"`)
 				alias = imp.Name.Name
 			} else {
-				// * use last part of path as alias
-				parts := strings.Split(importPath, "/")
-				alias = parts[len(parts)-1]
+				// * use the actual package name
+				alias = pkgName
 			}
 
 			imports[alias] = importPath
@@ -251,6 +264,55 @@ func (r *Generator) InterfaceExtractImportsFromFiles(packagePath string) map[str
 	}
 
 	return imports
+}
+
+// getPackageNameFromImportPath retrieves the actual package name from an import path
+// by reading the package's source files
+func (r *Generator) getPackageNameFromImportPath(importPath string) string {
+	// * check if it's a standard library package
+	if !strings.Contains(importPath, ".") {
+		parts := strings.Split(importPath, "/")
+		return parts[len(parts)-1]
+	}
+
+	// * for local packages, try to find the package directory
+	// * build the absolute path relative to the current working directory
+	pkgDir := filepath.Join(r.App.ProjectRoot(), importPath)
+
+	// * walk the directory to find a .go file and extract the package name
+	var pkgName string
+	filepath.Walk(pkgDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || pkgName != "" {
+			return nil
+		}
+
+		// * only process .go files (skip test files)
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		// * parse just the package clause
+		fset := token.NewFileSet()
+		node, err := parser.ParseFile(fset, path, nil, parser.PackageClauseOnly)
+		if err != nil {
+			return nil
+		}
+
+		if node.Name != nil {
+			pkgName = node.Name.Name
+			return filepath.SkipAll // we found it, stop walking
+		}
+
+		return nil
+	})
+
+	// * fallback to last part of path if we couldn't determine the package name
+	if pkgName == "" {
+		parts := strings.Split(importPath, "/")
+		pkgName = parts[len(parts)-1]
+	}
+
+	return pkgName
 }
 
 // InterfaceExtractReceiverMethods parses a Go file and extracts all receiver methods
@@ -285,7 +347,7 @@ func (r *Generator) InterfaceExtractReceiverMethods(filePath string) ([]MethodIn
 		// * extract parameters
 		var params []string
 		for _, param := range funcDecl.Type.Params.List {
-			paramType := form.ExprToString(param.Type)
+			paramType := code.ExprToString(param.Type)
 			if len(param.Names) > 1 {
 				// * multiple parameters with same type
 				for _, name := range param.Names {
@@ -302,7 +364,7 @@ func (r *Generator) InterfaceExtractReceiverMethods(filePath string) ([]MethodIn
 		var returns []string
 		if funcDecl.Type.Results != nil {
 			for _, result := range funcDecl.Type.Results.List {
-				resultType := form.ExprToString(result.Type)
+				resultType := code.ExprToString(result.Type)
 				if len(result.Names) > 1 {
 					// * multiple named return values with same type
 					for _, name := range result.Names {
@@ -486,7 +548,7 @@ func (r *Generator) InterfaceExtractTypesFromInterfaces() map[string]bool {
 				typ := parts[len(parts)-1]
 
 				// * handle built-in types that don't need imports
-				if form.IsBuiltinType(typ) {
+				if code.IsBuiltinType(typ) {
 					continue
 				}
 

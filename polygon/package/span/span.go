@@ -41,7 +41,7 @@ func (r *Span) Fork(layer string) *Span {
 		Layer:          &layer,
 		Context:        r.Context,
 		Caller:         caller,
-		Variables:      nil,
+		Variables:      make(map[string]any),
 		Started:        &now,
 		Ended:          nil,
 		TracingSpan:    tracingSpan,

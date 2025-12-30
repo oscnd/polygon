@@ -13,4 +13,5 @@
 
 ## Current Development
 
-- Currently, the main focus is on developing `pol` command line tool, test by (cd example && go run ../pol -d polygon database sequel schema)
+- Currently, the main focus is on developing `polygon` command line tool, test by (cd example && go run ../polygon/command/polygon -d polygon <subcommand>)
+- Install command globally using `go install ./polygon/command/polygon` and use `polygon <subcommand>` anywhere
