@@ -11,6 +11,7 @@ import (
 	"go.scnd.dev/open/polygon/command/polygon/common/config"
 	"go.scnd.dev/open/polygon/command/polygon/index"
 	"go.scnd.dev/open/polygon/command/polygon/subcommand/database/sequel"
+	"go.scnd.dev/open/polygon/command/polygon/subcommand/endpoint"
 	"go.scnd.dev/open/polygon/command/polygon/subcommand/inter"
 )
 
@@ -66,6 +67,7 @@ func main() {
 			fmt.Printf("  -v: verbose output\n\n")
 			fmt.Printf("Subcommands:\n")
 			fmt.Printf("  database sequel schema\t generate database schema from migrations\n")
+			fmt.Printf("  endpoint\t\t\t generate swagger documentation from endpoints\n")
 			fmt.Printf("  interface\t\t\t generate interfaces from receiver methods\n")
 			return
 		}
@@ -94,6 +96,11 @@ func main() {
 			}
 		} else {
 			println("unknown database subcommand:", args[1], args[2])
+		}
+	case "endpoint":
+		err := endpoint.EndpointGenerate(app)
+		if err != nil {
+			log.Fatalf("error generating swagger: %v", err)
 		}
 	case "interface":
 		err := inter.InterfaceGenerate(app)

@@ -1,8 +1,16 @@
 package polygon
 
-type Polygon interface {
-}
+import (
+	"context"
 
-func Init() Polygon {
-	return struct{}{}
+	"github.com/gofiber/fiber/v3"
+	"go.opentelemetry.io/otel/trace"
+)
+
+type Polygon interface {
+	Config() *Config
+	Tracer() trace.Tracer
+	TracerMiddleware() fiber.Handler
+	Instrument() Instrument
+	Span(context context.Context, name, layer string, arguments map[string]any) Span
 }

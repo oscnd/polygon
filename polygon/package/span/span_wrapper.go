@@ -1,0 +1,42 @@
+package span
+
+import (
+	"context"
+	"time"
+
+	"go.scnd.dev/open/polygon"
+)
+
+type Wrapper struct {
+	Span *Span `json:"span"`
+}
+
+func (r *Wrapper) Context() context.Context {
+	return r.Span.Context
+}
+
+func (r *Wrapper) SetContext(context context.Context) {
+	r.Span.Context.Context = context
+}
+
+func (r *Wrapper) Started() *time.Time {
+	return r.Span.Started
+}
+
+func (r *Wrapper) Variable(key string, value any) {
+	r.Span.Variable(key, value)
+}
+
+func (r *Wrapper) Fork(layer string) polygon.Span {
+	return &Wrapper{
+		Span: r.Span.Fork(layer),
+	}
+}
+
+func (r *Wrapper) Error(message string, err error) error {
+	return r.Span.Error(message, err)
+}
+
+func (r *Wrapper) End() {
+	r.Span.End()
+}
