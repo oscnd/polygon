@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -221,8 +222,9 @@ func (r *Generator) InterfaceExtractImportsFromFiles(packagePath string) map[str
 		}
 
 		// * parse the Go file to get both imports and package name
+		// * use ImportsOnly mode which includes package clause and imports
 		fset := token.NewFileSet()
-		node, err := parser.ParseFile(fset, path, nil, parser.PackageClauseOnly|parser.ImportsOnly)
+		node, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
 		if err != nil {
 			return nil // skip files that can't be parsed
 		}
@@ -267,7 +269,6 @@ func (r *Generator) InterfaceExtractImportsFromFiles(packagePath string) map[str
 }
 
 // getPackageNameFromImportPath retrieves the actual package name from an import path
-// by reading the package's source files
 func (r *Generator) getPackageNameFromImportPath(importPath string) string {
 	// * check if it's a standard library package
 	if !strings.Contains(importPath, ".") {
@@ -275,38 +276,52 @@ func (r *Generator) getPackageNameFromImportPath(importPath string) string {
 		return parts[len(parts)-1]
 	}
 
-	// * for local packages, try to find the package directory
-	// * build the absolute path relative to the current working directory
-	pkgDir := filepath.Join(r.App.ProjectRoot(), importPath)
+	// * try to use go list to get the package name (most reliable)
+	cmd := exec.Command("go", "list", "-f", "{{.Name}}", importPath)
+	output, err := cmd.Output()
+	if err == nil {
+		pkgName := strings.TrimSpace(string(output))
+		if pkgName != "" && pkgName != "{{.Name}}" {
+			return pkgName
+		}
+	}
+
+	// * fallback: try to resolve the directory and parse package from files
+	// * assume importPath is relative to current working directory (project root)
+	pkgDir := importPath
+
+	// * check if it's a relative path
+	if filepath.IsAbs(importPath) {
+		pkgDir = importPath
+	} else {
+		// * try as relative path from current working directory
+		if absPath, err := filepath.Abs(importPath); err == nil {
+			if info, err := os.Stat(absPath); err == nil && info.IsDir() {
+				pkgDir = absPath
+			}
+		}
+	}
 
 	// * walk the directory to find a .go file and extract the package name
 	var pkgName string
-	filepath.Walk(pkgDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || pkgName != "" {
-			return nil
+	if info, err := os.Stat(pkgDir); err == nil && info.IsDir() {
+		files, _ := os.ReadDir(pkgDir)
+		for _, file := range files {
+			if !strings.HasSuffix(file.Name(), ".go") || strings.HasSuffix(file.Name(), "_test.go") {
+				continue
+			}
+
+			filePath := filepath.Join(pkgDir, file.Name())
+			fset := token.NewFileSet()
+			node, err := parser.ParseFile(fset, filePath, nil, parser.PackageClauseOnly)
+			if err == nil && node.Name != nil {
+				pkgName = node.Name.Name
+				break
+			}
 		}
+	}
 
-		// * only process .go files (skip test files)
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-
-		// * parse just the package clause
-		fset := token.NewFileSet()
-		node, err := parser.ParseFile(fset, path, nil, parser.PackageClauseOnly)
-		if err != nil {
-			return nil
-		}
-
-		if node.Name != nil {
-			pkgName = node.Name.Name
-			return filepath.SkipAll // we found it, stop walking
-		}
-
-		return nil
-	})
-
-	// * fallback to last part of path if we couldn't determine the package name
+	// * final fallback to last part of path if we couldn't determine the package name
 	if pkgName == "" {
 		parts := strings.Split(importPath, "/")
 		pkgName = parts[len(parts)-1]
@@ -583,21 +598,20 @@ func (r *Generator) InterfaceFilterImportsByTypes(allImports map[string]string, 
 	neededImports := make(map[string]bool)
 	for typ := range usedTypes {
 		// * clean up the type name (remove *, [], etc.)
+		// * IMPORTANT: check for compound prefixes like []* before simple prefixes like []
 		cleanType := typ
-		if strings.HasPrefix(cleanType, "*") {
-			cleanType = cleanType[1:]
-		}
-		if strings.HasPrefix(cleanType, "[]") {
-			cleanType = cleanType[2:]
-		}
 		if strings.HasPrefix(cleanType, "[]*") {
 			cleanType = cleanType[3:]
-		}
-		if strings.HasPrefix(cleanType, "chan ") {
-			cleanType = cleanType[5:]
+		} else if strings.HasPrefix(cleanType, "[]") {
+			cleanType = cleanType[2:]
 		}
 		if strings.HasPrefix(cleanType, "chan *") {
 			cleanType = cleanType[6:]
+		} else if strings.HasPrefix(cleanType, "chan ") {
+			cleanType = cleanType[5:]
+		}
+		if strings.HasPrefix(cleanType, "*") {
+			cleanType = cleanType[1:]
 		}
 
 		// * handle types with package prefix (e.g., "payload.Chat")
