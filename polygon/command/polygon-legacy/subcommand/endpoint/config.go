@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.scnd.dev/open/polygon/command/polygon/index"
+	"go.scnd.dev/open/polygon/command/polygon-legacy/index"
 	"gopkg.in/yaml.v3"
 )
 

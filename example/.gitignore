@@ -1,0 +1,16 @@
+# local
+.DS_Store
+.local
+
+# development
+.idea
+.vscode
+
+# generated
+/generate
+zzz.go
+
+# external
+/.claude/**/polygon-*.md
+/sqlc.yml
+/makefile

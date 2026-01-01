@@ -3,7 +3,7 @@ package endpoint
 import (
 	"log"
 
-	"go.scnd.dev/open/polygon/command/polygon/index"
+	"go.scnd.dev/open/polygon/command/polygon-legacy/index"
 )
 
 // EndpointGenerate is the main entry point for endpoint swagger generation

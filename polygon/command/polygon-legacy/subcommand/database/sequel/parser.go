@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/bsthun/gut"
-	"go.scnd.dev/open/polygon/command/polygon/index"
+	"go.scnd.dev/open/polygon/command/polygon-legacy/index"
 	"go.scnd.dev/open/polygon/external/sqlc/config"
 	"go.scnd.dev/open/polygon/external/sqlc/migrations"
 	"go.scnd.dev/open/polygon/utility/form"

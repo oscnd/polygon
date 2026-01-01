@@ -1,45 +1,15 @@
 package prop
 
-import (
-	"database/sql/driver"
-	"encoding/json"
-	"errors"
-)
-
+// UserMetadata represents user-specific metadata
+// polygon sql/scanner
+// polygon sql/override column:users.metadata
 type UserMetadata struct {
 	Preferences map[string]any `json:"preferences,omitempty"`
 }
 
-func (r *UserMetadata) Scan(value any) error {
-	if value == nil {
-		return nil
-	}
-	data, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
-	}
-	return json.Unmarshal(data, r)
-}
-
-func (r *UserMetadata) Value() (driver.Value, error) {
-	return json.Marshal(r)
-}
-
+// UserSettings represents user-specific settings and preferences
+// polygon sql/scanner
+// polygon sql/override column:users.settings
 type UserSettings struct {
 	Theme *string `json:"theme,omitempty"`
-}
-
-func (r *UserSettings) Scan(value any) error {
-	if value == nil {
-		return nil
-	}
-	data, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
-	}
-	return json.Unmarshal(data, r)
-}
-
-func (r *UserSettings) Value() (driver.Value, error) {
-	return json.Marshal(r)
 }
