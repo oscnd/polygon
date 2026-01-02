@@ -1,13 +1,14 @@
 package code
 
 import (
+	"context"
 	"strings"
 
-	"go.scnd.dev/open/polygon/package/span"
+	"go.scnd.dev/open/polygon"
 )
 
 type Module struct {
-	Path     *string    `json:"path"`     // absolute module path
+	Path     *string    `json:"path"`     // absolute path
 	Name     *string    `json:"name"`     // module name
 	Packages []*Package `json:"packages"` // circular pointer to packages
 }
@@ -79,10 +80,13 @@ func New() *Canvas {
 	}
 }
 
-func (r *Import) AddImport(item *ImportItem) error {
-	// * construct error dimension
+func (r *Import) AddImport(ctx context.Context, item *ImportItem) error {
+	// * start span
+	s, ctx := polygon.With(ctx)
+	defer s.End()
+
 	if item.Path == nil {
-		return span.NewError(nil, "path is nil", nil)
+		return s.Error("path is nil", nil)
 	}
 	if item.Alias == nil {
 		segments := strings.Split(*item.Path, "/")
@@ -90,7 +94,7 @@ func (r *Import) AddImport(item *ImportItem) error {
 	}
 	for _, existing := range r.Imports {
 		if *existing.Alias == *item.Alias {
-			return span.NewError(nil, "import alias already exists", nil)
+			return s.Error("import alias already exists", nil)
 		}
 	}
 	r.Imports = append(r.Imports, item)

@@ -1,34 +1,41 @@
 package code
 
 import (
-	"fmt"
+	"context"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"path/filepath"
 	"strings"
+
+	"go.scnd.dev/open/polygon"
 )
 
-func ParsePackageFile(pkg *Package, filePath string) (*File, error) {
+func ParsePackageFile(ctx context.Context, pkg *Package, filePath string) (*File, error) {
+	// * start span
+	s, ctx := polygon.With(ctx)
+	defer s.End()
+	s.Variable("filePath", filePath)
+
 	if pkg == nil {
-		return nil, fmt.Errorf("package cannot be nil")
+		return nil, s.Error("package cannot be nil", nil)
 	}
 
 	if filePath == "" {
-		return nil, fmt.Errorf("file path cannot be empty")
+		return nil, s.Error("file path cannot be empty", nil)
 	}
 
-	// Parse the Go file
+	// * parse the Go file
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse file %s: %w", filePath, err)
+		return nil, s.Error("failed to parse file", err)
 	}
 
-	// Extract file name
+	// * extract file name
 	fileName := filepath.Base(filePath)
 
-	// Create file struct
+	// * create file struct
 	file := &File{
 		Package:    pkg,
 		Name:       &fileName,
@@ -38,11 +45,11 @@ func ParsePackageFile(pkg *Package, filePath string) (*File, error) {
 		Functions:  []*Method{},
 	}
 
-	// Walk the AST to extract types and functions
+	// * walk the AST to extract types and functions
 	ast.Inspect(node, func(n ast.Node) bool {
 		switch typedNode := n.(type) {
 		case *ast.GenDecl:
-			// Handle type declarations
+			// * handle type declarations
 			if typedNode.Tok == token.TYPE {
 				for _, spec := range typedNode.Specs {
 					typeSpec, ok := spec.(*ast.TypeSpec)
@@ -50,7 +57,7 @@ func ParsePackageFile(pkg *Package, filePath string) (*File, error) {
 						continue
 					}
 
-					// Check if it's an interface
+					// * check if it's an interface
 					if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
 						iface := ParsePackageInterface(typeSpec, node)
 						if iface != nil {
@@ -58,7 +65,7 @@ func ParsePackageFile(pkg *Package, filePath string) (*File, error) {
 						}
 					}
 
-					// Check if it's a struct
+					// * check if it's a struct
 					if _, ok := typeSpec.Type.(*ast.StructType); ok {
 						strct := ParsePackageStruct(typeSpec, node)
 						if strct != nil {
@@ -69,21 +76,21 @@ func ParsePackageFile(pkg *Package, filePath string) (*File, error) {
 			}
 
 		case *ast.FuncDecl:
-			// Handle function declarations
+			// * handle function declarations
 			if typedNode.Recv == nil {
-				// Regular function
+				// * regular function
 				fnc := ParsePackageFunction(typedNode, node)
 				if fnc != nil {
 					file.Functions = append(file.Functions, fnc)
 				}
 			} else {
-				// Method with receiver
+				// * method with receiver
 				receiver := ParsePackageReceiver(typedNode, node)
 				if receiver != nil {
 					file.Receivers = append(file.Receivers, receiver)
 				}
 
-				// Also add the method to functions
+				// * also add the method to functions
 				method := ParsePackageFunction(typedNode, node)
 				if method != nil {
 					file.Functions = append(file.Functions, method)
@@ -120,7 +127,7 @@ func ParsePackageInterface(node *ast.TypeSpec, file *ast.File) *Interface {
 					Results:    []*Parameter{},
 				}
 
-				// Parse parameters
+				// * parse parameters
 				if method.Type != nil {
 					if funcType, ok := method.Type.(*ast.FuncType); ok {
 						if funcType.Params != nil {
@@ -172,7 +179,7 @@ func ParsePackageMethod(node *ast.Field, file *ast.File) *Method {
 		return nil
 	}
 
-	// Use the first name (interface methods can have multiple names)
+	// * use the first name
 	name := node.Names[0].Name
 
 	method := &Method{
@@ -235,7 +242,7 @@ func ParsePackageReceiver(node *ast.FuncDecl, file *ast.File) *Receiver {
 
 	recv := node.Recv.List[0]
 
-	// Get receiver name (or "_" if unnamed)
+	// * get receiver name (or "_" if unnamed)
 	recvName := "_"
 	if len(recv.Names) > 0 && recv.Names[0] != nil {
 		recvName = recv.Names[0].Name
@@ -245,22 +252,20 @@ func ParsePackageReceiver(node *ast.FuncDecl, file *ast.File) *Receiver {
 		Name: &recvName,
 	}
 
-	// Find the struct that this receiver belongs to
+	// * find the struct that this receiver belongs to
 	if file.Scope != nil {
 		typeStr := ExprToString(recv.Type)
 		if typeStr != "" {
-			// Look for struct by type name (simplified approach)
+			// * look for struct by type name
 			for _, obj := range file.Scope.Objects {
 				if obj.Kind == ast.Typ && obj.Name == typeStr {
-					// This is a simplified approach - in a real implementation,
-					// you might want to maintain a mapping of types to structs
 					break
 				}
 			}
 		}
 	}
 
-	// Set the method
+	// * set the method
 	if node.Name != nil {
 		method := ParsePackageFunction(node, file)
 		if method != nil {
@@ -279,7 +284,7 @@ func ParsePackageParameter(node *ast.Field, file *ast.File) []*Parameter {
 		return parameters
 	}
 
-	// If there are multiple names for the same type
+	// * if there are multiple names for the same type
 	if len(node.Names) > 0 {
 		for _, name := range node.Names {
 			param := &Parameter{
@@ -289,7 +294,7 @@ func ParsePackageParameter(node *ast.Field, file *ast.File) []*Parameter {
 			parameters = append(parameters, param)
 		}
 	} else {
-		// Unnamed parameter (common in interface methods)
+		// * unnamed parameter (common in interface methods)
 		param := &Parameter{
 			Type: &typeStr,
 		}
@@ -307,13 +312,13 @@ func ParsePackageField(node *ast.Field, file *ast.File) []*Field {
 		return fields
 	}
 
-	// Parse struct tags
+	// * parse struct tags
 	var tags []*Tag
 	if node.Tag != nil {
 		tags = ParsePackageTags(node.Tag.Value)
 	}
 
-	// If there are multiple names for the same type
+	// * if there are multiple names for the same type
 	if len(node.Names) > 0 {
 		for _, name := range node.Names {
 			field := &Field{
@@ -324,7 +329,7 @@ func ParsePackageField(node *ast.Field, file *ast.File) []*Field {
 			fields = append(fields, field)
 		}
 	} else {
-		// Embedded field
+		// * embedded field
 		field := &Field{
 			Type: &typeStr,
 			Tags: tags,
@@ -340,7 +345,7 @@ func ParsePackageTags(tagStr string) []*Tag {
 		return nil
 	}
 
-	// Remove backticks from tag string
+	// * remove backticks from tag string
 	tagStr = strings.Trim(tagStr, "`")
 	if tagStr == "" {
 		return nil
@@ -348,7 +353,7 @@ func ParsePackageTags(tagStr string) []*Tag {
 
 	var tags []*Tag
 
-	// Split tags by space, but preserve quoted strings
+	// * split tags by space, but preserve quoted strings
 	var parts []string
 	var current strings.Builder
 	inQuotes := false
@@ -369,20 +374,20 @@ func ParsePackageTags(tagStr string) []*Tag {
 			current.WriteRune(char)
 		}
 
-		// Handle last character
+		// * handle last character
 		if i == len(tagStr)-1 && current.Len() > 0 {
 			parts = append(parts, current.String())
 		}
 	}
 
-	// Parse each tag part
+	// * parse each tag part
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
 
-		// Split tag name and value by colon
+		// * split tag name and value by colon
 		colonIndex := strings.Index(part, ":")
 		if colonIndex <= 0 {
 			continue
@@ -391,7 +396,7 @@ func ParsePackageTags(tagStr string) []*Tag {
 		name := strings.TrimSpace(part[:colonIndex])
 		value := strings.TrimSpace(part[colonIndex:])
 
-		// Remove quotes from value
+		// * remove quotes from value
 		value = strings.Trim(value, `"`)
 		value = strings.Trim(value, `'`)
 

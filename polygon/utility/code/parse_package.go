@@ -1,6 +1,7 @@
 package code
 
 import (
+	"context"
 	"fmt"
 	"go/parser"
 	"go/token"
@@ -8,57 +9,64 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.scnd.dev/open/polygon"
 )
 
-func ParsePackage(parser *Parser, path string) (*Package, error) {
+func ParsePackage(ctx context.Context, parser *Parser, path string) (*Package, error) {
+	// * start span
+	s, ctx := polygon.With(ctx)
+	defer s.End()
+	s.Variable("path", path)
+
 	if parser == nil {
-		return nil, fmt.Errorf("parser cannot be nil")
+		return nil, s.Error("parser cannot be nil", nil)
 	}
 
 	if path == "" {
-		return nil, fmt.Errorf("package path cannot be empty")
+		return nil, s.Error("package path cannot be empty", nil)
 	}
 
-	// Validate that the path exists and is a directory
+	// * validate that the path exists and is a directory
 	info, err := os.Stat(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to access package path %s: %w", path, err)
+		return nil, s.Error("failed to access package path", err)
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("package path %s is not a directory", path)
+		return nil, s.Error("package path is not a directory", nil)
 	}
 
-	// Extract package name from first .go file in the directory
-	packageName, err := ParsePackagePackageName(path)
+	// * extract package name from first .go file in the directory
+	packageName, err := ParsePackagePackageName(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract package name: %w", err)
+		return nil, s.Error("failed to extract package name", err)
 	}
 
-	// Get relative path from module root
+	// * get relative path from module root
 	var relativePath *string
 	if parser.Module != nil && parser.Module.Path != nil {
 		rel, err := filepath.Rel(*parser.Module.Path, path)
 		if err != nil {
 			log.Printf("warning: failed to get relative path from module root: %v", err)
-			relativePath = &path // Use absolute path as fallback
+			relativePath = &path
 		} else {
 			relativePath = &rel
 		}
 	} else {
-		relativePath = &path // No module root available
+		relativePath = &path
 	}
 
-	// Extract directory name
+	// * extract directory name
 	dirName := filepath.Base(path)
 
-	// Extract package name (last part of full package name)
+	// * extract package name (last part of full package name)
 	packageNameLast := packageName
 	if lastSlash := strings.LastIndex(packageName, "/"); lastSlash >= 0 {
 		packageNameLast = packageName[lastSlash+1:]
 	}
 
-	// Create package struct
+	// * create package struct
 	pkg := &Package{
 		Path:          relativePath,
 		DirectoryName: &dirName,
@@ -68,28 +76,28 @@ func ParsePackage(parser *Parser, path string) (*Package, error) {
 		Module:        parser.Module,
 	}
 
-	// Read directory contents and parse Go files
+	// * read directory contents and parse Go files
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read directory %s: %w", path, err)
+		return nil, s.Error("failed to read directory", err)
 	}
 
 	for _, entry := range entries {
-		// Skip directories and non-Go files
+		// * skip directories and non-Go files
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
 			continue
 		}
 
-		// Skip test files
+		// * skip test files
 		if strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
 		}
 
 		filePath := filepath.Join(path, entry.Name())
-		file, err := ParsePackageFile(pkg, filePath)
+		file, err := ParsePackageFile(ctx, pkg, filePath)
 		if err != nil {
 			log.Printf("warning: failed to parse file %s: %v", filePath, err)
-			continue // Continue with other files
+			continue
 		}
 
 		if file != nil {
@@ -100,13 +108,18 @@ func ParsePackage(parser *Parser, path string) (*Package, error) {
 	return pkg, nil
 }
 
-func ParsePackagePackageName(absolutePath string) (string, error) {
+func ParsePackagePackageName(ctx context.Context, absolutePath string) (string, error) {
+	// * start span
+	s, ctx := polygon.With(ctx)
+	defer s.End()
+	s.Variable("absolutePath", absolutePath)
+
 	entries, err := os.ReadDir(absolutePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read directory %s: %w", absolutePath, err)
+		return "", s.Error("failed to read directory", err)
 	}
 
-	// Find the first .go file (excluding test files) to extract package name
+	// * find the first .go file (excluding test files) to extract package name
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
@@ -114,7 +127,7 @@ func ParsePackagePackageName(absolutePath string) (string, error) {
 
 		filePath := filepath.Join(absolutePath, entry.Name())
 
-		// Parse the file to extract package name
+		// * parse the file to extract package name
 		fset := token.NewFileSet()
 		node, err := parser.ParseFile(fset, filePath, nil, parser.PackageClauseOnly)
 		if err != nil {
@@ -127,5 +140,5 @@ func ParsePackagePackageName(absolutePath string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("no Go files found in directory %s", absolutePath)
+	return "", s.Error("no Go files found in directory", nil)
 }

@@ -2,35 +2,44 @@ package code
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.scnd.dev/open/polygon"
+	"go.scnd.dev/open/polygon/package/span"
 )
 
 type Parser struct {
 	Module *Module
 }
 
-func NewParser(modulePath string) (*Parser, error) {
+func NewParser(ctx context.Context, modulePath string) (*Parser, error) {
+	// * start span
+	s, ctx := polygon.With(ctx)
+	defer s.End()
+	s.Variable("modulePath", modulePath)
+
 	if modulePath == "" {
-		return nil, fmt.Errorf("module path cannot be empty")
+		return nil, s.Error("module path cannot be empty", nil)
 	}
 
-	// Validate that the path exists and is a directory
+	// * validate that the path exists and is a directory
 	info, err := os.Stat(modulePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to access module path %s: %w", modulePath, err)
+		return nil, s.Error("failed to access module path", err)
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("module path %s is not a directory", modulePath)
+		return nil, s.Error("module path is not a directory", nil)
 	}
 
-	// Extract module name from go.mod file
+	// * extract module name from go.mod file
 	goModPath := filepath.Join(modulePath, "go.mod")
-	moduleName := filepath.Base(modulePath) // Fallback
+	moduleName := filepath.Base(modulePath)
 
 	if file, err := os.Open(goModPath); err == nil {
 		defer file.Close()
@@ -59,60 +68,64 @@ func NewParser(modulePath string) (*Parser, error) {
 	return parser, nil
 }
 
-func (p *Parser) ParseModule() error {
-	if p.Module == nil || p.Module.Path == nil {
-		return fmt.Errorf("parser not initialized or module path not set")
+func (r *Parser) ParseModule(ctx context.Context) error {
+	// * start span
+	s, ctx := polygon.With(ctx)
+	defer s.End()
+
+	if r.Module == nil || r.Module.Path == nil {
+		return s.Error("parser not initialized or module path not set", nil)
 	}
 
-	// Walk through the module directory to find Go packages
-	err := filepath.Walk(*p.Module.Path, func(path string, info os.FileInfo, err error) error {
+	// * walk through the module directory to find Go packages
+	err := filepath.Walk(*r.Module.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Printf("warning: error accessing path %s: %v", path, err)
-			return nil // Continue walking
+			return nil
 		}
 
-		// Skip directories that should not be packages
+		// * skip directories that should not be packages
 		if info.IsDir() {
 			dirName := filepath.Base(path)
-			// Skip hidden directories and common non-package directories
+			// * skip hidden directories and common non-package directories
 			if strings.HasPrefix(dirName, ".") || dirName == "vendor" || dirName == "node_modules" {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 
-		// Only process .go files, skip test files
+		// * only process .go files, skip test files
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
 
-		// Get the directory containing this Go file
+		// * get the directory containing this Go file
 		dirPath := filepath.Dir(path)
 
-		// Check if we've already processed this directory
-		for _, pkg := range p.Module.Packages {
+		// * check if we've already processed this directory
+		for _, pkg := range r.Module.Packages {
 			if pkg.Path != nil && *pkg.Path == dirPath {
-				return nil // Already processed this package
+				return nil
 			}
 		}
 
-		// Parse the package
-		pkg, err := ParsePackage(p, dirPath)
+		// * parse the package
+		pkg, err := ParsePackage(ctx, r, dirPath)
 		if err != nil {
 			log.Printf("warning: failed to parse package at %s: %v", dirPath, err)
-			return nil // Continue with other packages
+			return nil
 		}
 
-		// Add package to module
+		// * add package to module
 		if pkg != nil {
-			p.Module.Packages = append(p.Module.Packages, pkg)
+			r.Module.Packages = append(r.Module.Packages, pkg)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("error walking module directory: %w", err)
+		return s.Error("error walking module directory", err)
 	}
 
 	return nil
