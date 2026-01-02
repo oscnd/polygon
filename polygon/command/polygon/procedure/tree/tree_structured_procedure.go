@@ -1,12 +1,12 @@
 package tree
 
 import (
-	"fmt"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"go.scnd.dev/open/polygon/package/span"
+	"go.scnd.dev/open/polygon"
 )
 
 const (
@@ -19,11 +19,26 @@ type StructuredProcedure struct {
 	DependsOn []*DependencyTarget
 }
 
+func ParseStructuredProcedures(polygon polygon.Polygon, ctx context.Context) (map[string]*StructuredProcedure, error) {
+	layer := polygon.Layer("StructuredProcedureParser", "procedure")
+	_, ctx = layer.With(ctx)
+	parser := &StructuredProcedureParser{
+		Layer: layer,
+	}
+
+	return parser.Parse(ctx)
+}
+
 type StructuredProcedureParser struct {
+	Layer      polygon.Layer
 	Procedures map[string]*StructuredProcedure
 }
 
-func (r *StructuredProcedureParser) Parse() (map[string]*StructuredProcedure, error) {
+func (r *StructuredProcedureParser) Parse(ctx context.Context) (map[string]*StructuredProcedure, error) {
+	// * start span
+	s, ctx := r.Layer.With(ctx)
+	defer s.End()
+
 	// * reset procedures map
 	r.Procedures = make(map[string]*StructuredProcedure)
 
@@ -34,11 +49,11 @@ func (r *StructuredProcedureParser) Parse() (map[string]*StructuredProcedure, er
 			return r.Procedures, nil
 		}
 
-		return nil, span.NewError(nil, "failed to read procedure directory", err)
+		return nil, s.Error("failed to read procedure directory", err)
 	}
 
 	for _, entry := range entries {
-		if err := r.ParseEntry(entry); err != nil {
+		if err := r.ParseEntry(ctx, entry); err != nil {
 			return nil, err
 		}
 	}
@@ -46,31 +61,38 @@ func (r *StructuredProcedureParser) Parse() (map[string]*StructuredProcedure, er
 	return r.Procedures, nil
 }
 
-func (r *StructuredProcedureParser) ParseEntry(entry os.DirEntry) error {
+func (r *StructuredProcedureParser) ParseEntry(ctx context.Context, entry os.DirEntry) error {
+	// * start span
+	s, ctx := r.Layer.With(ctx)
+	s.Variable("name", entry.Name())
+	defer s.End()
+
+	// * construct path
 	path := filepath.Join(StructuredProcedureDirectoryName, entry.Name())
 
 	// * check for file in root procedure
 	if !entry.IsDir() {
-		return span.NewError(nil, fmt.Sprintf("file is not in structural procedure tree", entry.Name()), nil)
+		return s.Error("file is not in structural procedure tree", nil)
 	}
 
 	// * check for initializer
 	procPath := filepath.Join(path, StructuredProcedureInitializer)
 	if _, err := os.Stat(procPath); err != nil {
 		if os.IsNotExist(err) {
-			return span.NewError(nil, fmt.Sprintf("procedure \"%s\" is missing initializer file", entry.Name()), nil)
+			return s.Error("procedure is missing initializer file", nil)
 		}
-		return span.NewError(nil, fmt.Sprintf("failed to access initializer file of procedure \"%s\"", entry.Name()), err)
+		return s.Error("failed to stat procedure initializer file", err)
 	}
 
 	// * check contents of the procedure subdirectory
 	subEntries, err := os.ReadDir(path)
 	if err != nil {
-		return span.NewError(nil, fmt.Sprintf("failed to read contents of procedure \"%s\" directory", entry.Name()), err)
+		return s.Error("failed to read procedure subdirectory", err)
 	}
 
 	for _, subEntry := range subEntries {
 		subName := subEntry.Name()
+		s.Variable("subentry", subName)
 
 		// * skip initializer
 		if subName == StructuredProcedureInitializer {
@@ -79,12 +101,12 @@ func (r *StructuredProcedureParser) ParseEntry(entry os.DirEntry) error {
 
 		// * check if sub-entry is a directory
 		if subEntry.IsDir() {
-			return fmt.Errorf("directory \"%s\" is not in a procedure \"%s\" structural tree", subName, entry.Name())
+			return s.Error("subentry is directory", nil)
 		}
 
 		// * check for the file prefix
 		if !strings.HasPrefix(subName, "proc_") {
-			return fmt.Errorf("file \"%s\" is not in a procedure \"%s\" structural tree", subName, entry.Name())
+			return s.Error("subentry file does not have 'proc_' prefix", nil)
 		}
 	}
 

@@ -1,8 +1,6 @@
 package core
 
 import (
-	"context"
-
 	"github.com/gofiber/fiber/v3"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.scnd.dev/open/polygon"
@@ -33,10 +31,8 @@ func (r *Instance) Config() *polygon.Config {
 	return r.config
 }
 
-func (r *Instance) Span(context context.Context, name string, layer string, arguments map[string]any) polygon.Span {
-	return &span.Wrapper{
-		Span: span.NewContext(r, context, name, layer, arguments),
-	}
+func (r *Instance) Layer(name string, typ string) polygon.Layer {
+	return span.NewLayer(r, name, typ)
 }
 
 func (r *Instance) Tracer() oteltrace.Tracer {
