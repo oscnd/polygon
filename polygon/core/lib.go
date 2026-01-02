@@ -46,3 +46,7 @@ func (r *Instance) TracerMiddleware() fiber.Handler {
 func (r *Instance) Instrument() polygon.Instrument {
 	return r.telemetry.Instrument
 }
+
+func init() {
+	polygon.With = span.With
+}

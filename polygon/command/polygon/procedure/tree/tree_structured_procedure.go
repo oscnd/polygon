@@ -19,24 +19,20 @@ type StructuredProcedure struct {
 	DependsOn []*DependencyTarget
 }
 
-func ParseStructuredProcedures(polygon polygon.Polygon, ctx context.Context) (map[string]*StructuredProcedure, error) {
-	layer := polygon.Layer("StructuredProcedureParser", "procedure")
-	_, ctx = layer.With(ctx)
-	parser := &StructuredProcedureParser{
-		Layer: layer,
-	}
+func ParseStructuredProcedure(ctx context.Context) (map[string]*StructuredProcedure, error) {
+	_, ctx = polygon.With(ctx)
 
+	parser := new(StructuredProcedureParser)
 	return parser.Parse(ctx)
 }
 
 type StructuredProcedureParser struct {
-	Layer      polygon.Layer
 	Procedures map[string]*StructuredProcedure
 }
 
 func (r *StructuredProcedureParser) Parse(ctx context.Context) (map[string]*StructuredProcedure, error) {
 	// * start span
-	s, ctx := r.Layer.With(ctx)
+	s, ctx := polygon.With(ctx)
 	defer s.End()
 
 	// * reset procedures map
@@ -63,7 +59,7 @@ func (r *StructuredProcedureParser) Parse(ctx context.Context) (map[string]*Stru
 
 func (r *StructuredProcedureParser) ParseEntry(ctx context.Context, entry os.DirEntry) error {
 	// * start span
-	s, ctx := r.Layer.With(ctx)
+	s, ctx := polygon.With(ctx)
 	s.Variable("name", entry.Name())
 	defer s.End()
 

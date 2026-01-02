@@ -1,6 +1,8 @@
 package polygon
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -12,3 +14,5 @@ type Polygon interface {
 	TracerMiddleware() fiber.Handler
 	Instrument() Instrument
 }
+
+var With func(ctx context.Context) (Span, context.Context)
