@@ -9,24 +9,27 @@ import (
 )
 
 type Command struct {
-	Force bool `help:"Force clean structure" short:"v"`
+	App   *app.App
+	Force bool `help:"Force clean structure" short:"f"`
 }
 
 func (r *Command) Run(app *app.App) error {
-	return Run(app, r)
+	r.App = app
+	return Run(r)
 }
 
-func Run(app *app.App, command *Command) error {
+func Run(command *Command) error {
 	ctx := context.Background()
 	span, ctx := polygon.With(ctx)
 
 	// * check tree
-	tree, err := tree.New(ctx)
+	tr, err := tree.New(ctx)
 	if err != nil {
 		return span.Error("invalid tree", err)
 	}
 
-	_ = tree
+	// * print tree summary
+	_ = tr
 
 	return nil
 }
