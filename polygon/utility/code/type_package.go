@@ -1,12 +1,12 @@
 package code
 
 type Package struct {
-	Path          *string `json:"path"`        // relative path from module root
-	DirectoryName *string `json:"dirName"`     // last part of path
-	Package       *string `json:"package"`     // full package name
-	PackageName   *string `json:"packageName"` // last part of package name
-	Module        *Module `json:"module"`
-	Files         []*File `json:"files"`
+	Path          *string          `json:"path"`        // relative path from module root
+	DirectoryName *string          `json:"dirName"`     // last part of path
+	Package       *string          `json:"package"`     // full package name
+	PackageName   *string          `json:"packageName"` // package name from ast
+	Files         map[string]*File `json:"files"`       // key: file name with .go extension
+	Module        *Module          `json:"module"`      // back reference to parent module
 }
 
 func (r *Package) Interfaces() []*Interface {
@@ -33,15 +33,15 @@ func (r *Package) Receivers() []*Receiver {
 	return receivers
 }
 
-func (r *Package) Functions() []*Method {
-	functions := make([]*Method, 0)
+func (r *Package) Functions() []*Function {
+	functions := make([]*Function, 0)
 	for _, file := range r.Files {
 		functions = append(functions, file.Functions...)
 	}
 	return functions
 }
 
-func (r *Package) EntityByName(name string) (*Interface, *Struct, *Receiver, *Method) {
+func (r *Package) EntityByName(name string) (*Interface, *Struct, *Receiver, *Function) {
 	for _, iface := range r.Interfaces() {
 		if iface.Name != nil && *iface.Name == name {
 			return iface, nil, nil, nil
@@ -63,4 +63,9 @@ func (r *Package) EntityByName(name string) (*Interface, *Struct, *Receiver, *Me
 		}
 	}
 	return nil, nil, nil, nil
+}
+
+func (r *Package) FileByName(name string) (*File, bool) {
+	file, exists := r.Files[name]
+	return file, exists
 }

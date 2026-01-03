@@ -22,20 +22,24 @@ type Span struct {
 
 func (r *Span) Variable(key string, value any) {
 	r.Variables[key] = value
-	// TODO: add json marshalling if value is struct or map, or keep if string
-	r.TraceSpan.SetAttributes(attribute.String(fmt.Sprintf("var.%s", key), fmt.Sprintf("%v", value)))
+	if r.TraceSpan != nil {
+		// TODO: add json marshalling if value is struct or map, or keep if string
+		r.TraceSpan.SetAttributes(attribute.String(fmt.Sprintf("var.%s", key), fmt.Sprintf("%v", value)))
+	}
 }
 
 func (r *Span) Error(message string, err error) error {
 	return NewError(r, message, err)
 }
 
-func (r *Span) Tracing() trace.Span {
+func (r *Span) Trace() trace.Span {
 	return r.TraceSpan
 }
 
 func (r *Span) End() {
 	end := time.Now()
 	r.Ended = &end
-	r.TraceSpan.End()
+	if r.TraceSpan != nil {
+		r.TraceSpan.End()
+	}
 }

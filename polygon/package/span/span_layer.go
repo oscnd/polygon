@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.scnd.dev/open/polygon"
 )
 
@@ -17,7 +18,7 @@ type Layer struct {
 }
 
 func NewLayer(polygon polygon.Polygon, name string, typ string) *Layer {
-	caller := NewCaller(2)
+	caller := NewCaller()
 
 	return &Layer{
 		Polygon: polygon,
@@ -27,58 +28,35 @@ func NewLayer(polygon polygon.Polygon, name string, typ string) *Layer {
 	}
 }
 
-func With(ctx context.Context) (polygon.Span, context.Context) {
-	span, ok := ctx.Value(ContextKeySpan).(*Span)
-	caller := NewCaller(2)
-	name := caller.String()
-	now := time.Now()
-
-	if !ok {
-		s := &Span{
-			Name:      &name,
-			Path:      []*string{},
-			Layer:     nil,
-			Caller:    caller,
-			Variables: make(map[string]any),
-			Started:   &now,
-			Ended:     nil,
-			Children:  []*Span{},
-			TraceSpan: nil,
-		}
-
-		return &Wrapper{Span: s}, context.WithValue(ctx, ContextKeySpan, s)
-	}
-
-	s := &Span{
-		Name:      &name,
-		Path:      append(span.Path, span.Name),
-		Layer:     nil,
-		Caller:    caller,
-		Variables: make(map[string]any),
-		Started:   &now,
-		Ended:     nil,
-		Children:  []*Span{},
-		TraceSpan: nil,
-	}
-	span.Children = append(span.Children, s)
-
-	return &Wrapper{Span: s}, context.WithValue(ctx, ContextKeySpan, s)
-}
-
 func (r *Layer) With(ctx context.Context) (polygon.Span, context.Context) {
 	span, ok := ctx.Value(ContextKeySpan).(*Span)
-	caller := NewCaller(2)
+	caller := NewCaller()
 	name := caller.String()
 	now := time.Now()
 
-	ctx, tracingSpan := r.Polygon.Tracer().Start(ctx, caller.String())
-	tracingSpan.SetAttributes(attribute.String("span.layer", fmt.Sprintf("%s/%s", r.Type, r.Name)))
+	var layer *Layer
+	if r.Name != "" {
+		layer = r
+	}
+
+	var plg polygon.Polygon
+	var tracingSpan trace.Span
+	if r.Polygon != nil {
+		plg = r.Polygon
+	} else {
+		plg = FromContext(ctx)
+	}
+
+	if plg == nil {
+		ctx, tracingSpan = plg.Tracer().Start(ctx, caller.String())
+		tracingSpan.SetAttributes(attribute.String("span.layer", fmt.Sprintf("%s/%s", r.Type, r.Name)))
+	}
 
 	if !ok {
 		s := &Span{
 			Name:      &name,
 			Path:      []*string{},
-			Layer:     r,
+			Layer:     layer,
 			Caller:    caller,
 			Variables: make(map[string]any),
 			Started:   &now,
@@ -93,7 +71,7 @@ func (r *Layer) With(ctx context.Context) (polygon.Span, context.Context) {
 	s := &Span{
 		Name:      &name,
 		Path:      append(span.Path, span.Name),
-		Layer:     r,
+		Layer:     layer,
 		Caller:    caller,
 		Variables: make(map[string]any),
 		Started:   &now,

@@ -24,6 +24,8 @@ func New(config *polygon.Config) (_ polygon.Polygon, err error) {
 		return nil, err
 	}
 
+	polygon.With = span.NewLayer(i, "", "").With
+
 	return i, nil
 }
 
@@ -48,5 +50,5 @@ func (r *Instance) Instrument() polygon.Instrument {
 }
 
 func init() {
-	polygon.With = span.With
+	polygon.With = span.NewLayer(new(Instance), "", "").With
 }

@@ -3,14 +3,12 @@ package code
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"go.scnd.dev/open/polygon"
-	"go.scnd.dev/open/polygon/package/span"
 )
 
 type Parser struct {
@@ -59,74 +57,70 @@ func NewParser(ctx context.Context, modulePath string) (*Parser, error) {
 
 	parser := &Parser{
 		Module: &Module{
-			Path:     &modulePath,
-			Name:     &moduleName,
-			Packages: []*Package{},
+			Path:         &modulePath,
+			Name:         &moduleName,
+			Packages:     make(map[string]*Package),
+			PackageNames: make(map[string]string),
 		},
 	}
 
 	return parser, nil
 }
 
-func (r *Parser) ParseModule(ctx context.Context) error {
+func (r *Parser) PackageByPath(ctx context.Context, path string) (*Package, error) {
 	// * start span
 	s, ctx := polygon.With(ctx)
 	defer s.End()
+	s.Variable("path", path)
 
-	if r.Module == nil || r.Module.Path == nil {
-		return s.Error("parser not initialized or module path not set", nil)
+	if r.Module == nil {
+		return nil, s.Error("parser not initialized", nil)
 	}
 
-	// * walk through the module directory to find Go packages
-	err := filepath.Walk(*r.Module.Path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Printf("warning: error accessing path %s: %v", path, err)
-			return nil
-		}
+	if path == "" {
+		return nil, s.Error("path cannot be empty", nil)
+	}
 
-		// * skip directories that should not be packages
-		if info.IsDir() {
-			dirName := filepath.Base(path)
-			// * skip hidden directories and common non-package directories
-			if strings.HasPrefix(dirName, ".") || dirName == "vendor" || dirName == "node_modules" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	// * check if already parsed
+	if pkg, exists := r.Module.Packages[path]; exists {
+		return pkg, nil
+	}
 
-		// * only process .go files, skip test files
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-
-		// * get the directory containing this Go file
-		dirPath := filepath.Dir(path)
-
-		// * check if we've already processed this directory
-		for _, pkg := range r.Module.Packages {
-			if pkg.Path != nil && *pkg.Path == dirPath {
-				return nil
-			}
-		}
-
-		// * parse the package
-		pkg, err := ParsePackage(ctx, r, dirPath)
-		if err != nil {
-			log.Printf("warning: failed to parse package at %s: %v", dirPath, err)
-			return nil
-		}
-
-		// * add package to module
-		if pkg != nil {
-			r.Module.Packages = append(r.Module.Packages, pkg)
-		}
-
-		return nil
-	})
-
+	// * parse the package
+	pkg, err := r.ParsePackage(ctx, path)
 	if err != nil {
-		return s.Error("error walking module directory", err)
+		return nil, s.Error("failed to parse package", err)
 	}
 
-	return nil
+	// * add to module maps
+	if pkg != nil && pkg.Path != nil && pkg.PackageName != nil {
+		r.Module.Packages[*pkg.Path] = pkg
+		r.Module.PackageNames[*pkg.PackageName] = *pkg.Path
+	}
+
+	return pkg, nil
+}
+
+func (r *Parser) PackageByName(ctx context.Context, name string) (*Package, error) {
+	// * start span
+	s, ctx := polygon.With(ctx)
+	defer s.End()
+	s.Variable("name", name)
+
+	if r.Module == nil {
+		return nil, s.Error("parser not initialized", nil)
+	}
+
+	if name == "" {
+		return nil, s.Error("name cannot be empty", nil)
+	}
+
+	// * lookup in PackageNames map
+	relPath, exists := r.Module.PackageNames[name]
+	if !exists {
+		return nil, s.Error("package not found", nil)
+	}
+
+	// * use PackageByPath to get or parse
+	return r.PackageByPath(ctx, relPath)
 }

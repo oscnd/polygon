@@ -2,6 +2,8 @@ package span
 
 import (
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Wrapper struct {
@@ -18,6 +20,10 @@ func (r *Wrapper) Variable(key string, value any) {
 
 func (r *Wrapper) Error(message string, err error) error {
 	return r.Span.Error(message, err)
+}
+
+func (r *Wrapper) Trace() trace.Span {
+	return r.Span.Trace()
 }
 
 func (r *Wrapper) End() {

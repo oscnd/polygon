@@ -3,6 +3,8 @@ package polygon
 import (
 	"context"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Layer interface {
@@ -13,6 +15,7 @@ type Span interface {
 	Started() *time.Time
 	Variable(key string, value any)
 	Error(message string, err error) error
+	Trace() trace.Span
 	End()
 }
 

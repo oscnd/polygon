@@ -21,6 +21,7 @@ import (
 
 type Telemetry struct {
 	Polygon    polygon.Polygon
+	Layer      polygon.Layer
 	Meter      metric.Meter
 	Tracer     trace.Tracer
 	Instrument *Instrument
@@ -29,9 +30,11 @@ type Telemetry struct {
 func New(polygon polygon.Polygon) (_ *Telemetry, err error) {
 	// * construct telemetry
 	telemetry := &Telemetry{
-		Polygon: polygon,
-		Meter:   nil,
-		Tracer:  nil,
+		Polygon:    polygon,
+		Layer:      polygon.Layer("telemetry", "polygon"),
+		Meter:      nil,
+		Tracer:     nil,
+		Instrument: nil,
 	}
 
 	// * construct resource

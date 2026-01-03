@@ -20,7 +20,7 @@ type ErrorItem struct {
 }
 
 func NewError(span *Span, message string, err error) error {
-	trace := NewCaller(2)
+	trace := NewCaller()
 	if err == nil {
 		return &Error{
 			Items: []*ErrorItem{

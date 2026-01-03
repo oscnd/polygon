@@ -12,13 +12,13 @@ import (
 	"go.scnd.dev/open/polygon"
 )
 
-func ParsePackage(ctx context.Context, parser *Parser, path string) (*Package, error) {
+func (r *Parser) ParsePackage(ctx context.Context, path string) (*Package, error) {
 	// * start span
 	s, ctx := polygon.With(ctx)
 	defer s.End()
 	s.Variable("path", path)
 
-	if parser == nil {
+	if r == nil {
 		return nil, s.Error("parser cannot be nil", nil)
 	}
 
@@ -37,15 +37,15 @@ func ParsePackage(ctx context.Context, parser *Parser, path string) (*Package, e
 	}
 
 	// * extract package name from first .go file in the directory
-	packageName, err := ParsePackagePackageName(ctx, path)
+	packageName, err := r.ParsePackageName(ctx, path)
 	if err != nil {
 		return nil, s.Error("failed to extract package name", err)
 	}
 
 	// * get relative path from module root
 	var relativePath *string
-	if parser.Module != nil && parser.Module.Path != nil {
-		rel, err := filepath.Rel(*parser.Module.Path, path)
+	if r.Module != nil && r.Module.Path != nil {
+		rel, err := filepath.Rel(*r.Module.Path, path)
 		if err != nil {
 			log.Printf("warning: failed to get relative path from module root: %v", err)
 			relativePath = &path
@@ -59,20 +59,14 @@ func ParsePackage(ctx context.Context, parser *Parser, path string) (*Package, e
 	// * extract directory name
 	dirName := filepath.Base(path)
 
-	// * extract package name (last part of full package name)
-	packageNameLast := packageName
-	if lastSlash := strings.LastIndex(packageName, "/"); lastSlash >= 0 {
-		packageNameLast = packageName[lastSlash+1:]
-	}
-
 	// * create package struct
 	pkg := &Package{
 		Path:          relativePath,
 		DirectoryName: &dirName,
 		Package:       &packageName,
-		PackageName:   &packageNameLast,
-		Files:         []*File{},
-		Module:        parser.Module,
+		PackageName:   &packageName,
+		Files:         make(map[string]*File),
+		Module:        r.Module,
 	}
 
 	// * read directory contents and parse Go files
@@ -93,21 +87,21 @@ func ParsePackage(ctx context.Context, parser *Parser, path string) (*Package, e
 		}
 
 		filePath := filepath.Join(path, entry.Name())
-		file, err := ParsePackageFile(ctx, pkg, filePath)
+		file, err := ParseFile(ctx, pkg, filePath)
 		if err != nil {
 			log.Printf("warning: failed to parse file %s: %v", filePath, err)
 			continue
 		}
 
 		if file != nil {
-			pkg.Files = append(pkg.Files, file)
+			pkg.Files[entry.Name()] = file
 		}
 	}
 
 	return pkg, nil
 }
 
-func ParsePackagePackageName(ctx context.Context, absolutePath string) (string, error) {
+func (r *Parser) ParsePackageName(ctx context.Context, absolutePath string) (string, error) {
 	// * start span
 	s, ctx := polygon.With(ctx)
 	defer s.End()
