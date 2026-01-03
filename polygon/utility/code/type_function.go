@@ -7,6 +7,7 @@ type Function struct {
 	Node       *ast.FuncDecl `json:"node"`
 	Parameters []*Parameter  `json:"parameters"`
 	Results    []*Parameter  `json:"results"`
+	Annotates  []*Annotate   `json:"annotates"`
 }
 
 type Parameter struct {

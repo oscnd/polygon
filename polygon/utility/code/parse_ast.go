@@ -77,6 +77,7 @@ func ParseFileStruct(ctx context.Context, node *ast.TypeSpec, file *ast.File) *S
 		Node:      node,
 		Fields:    []*Field{},
 		Receivers: []*Receiver{},
+		Annotates: ParseFileAnnotations(node.Doc),
 	}
 
 	if structType, ok := node.Type.(*ast.StructType); ok && structType.Fields != nil {
@@ -103,6 +104,7 @@ func ParseFileFunction(ctx context.Context, node *ast.FuncDecl, file *ast.File) 
 		Node:       node,
 		Parameters: []*Parameter{},
 		Results:    []*Parameter{},
+		Annotates:  ParseFileAnnotations(node.Doc),
 	}
 
 	if node.Type.Params != nil {
@@ -139,8 +141,11 @@ func ParseFileReceiver(ctx context.Context, node *ast.FuncDecl, file *ast.File) 
 		recvName = recv.Names[0].Name
 	}
 
+	annotates := ParseFileAnnotations(node.Doc)
+
 	receiver := &Receiver{
-		Name: &recvName,
+		Name:      &recvName,
+		Annotates: annotates,
 	}
 
 	// * find the struct that this receiver belongs to
@@ -217,21 +222,26 @@ func ParseFileField(ctx context.Context, node *ast.Field, file *ast.File) []*Fie
 		tags = ParseFileTags(node.Tag.Value)
 	}
 
+	// * parse annotations
+	annotates := ParseFileAnnotations(node.Doc)
+
 	// * if there are multiple names for the same type
 	if len(node.Names) > 0 {
 		for _, name := range node.Names {
 			field := &Field{
-				Name: &name.Name,
-				Type: &typeStr,
-				Tags: tags,
+				Name:      &name.Name,
+				Type:      &typeStr,
+				Tags:      tags,
+				Annotates: annotates,
 			}
 			fields = append(fields, field)
 		}
 	} else {
 		// * embedded field
 		field := &Field{
-			Type: &typeStr,
-			Tags: tags,
+			Type:      &typeStr,
+			Tags:      tags,
+			Annotates: annotates,
 		}
 		fields = append(fields, field)
 	}
@@ -309,4 +319,59 @@ func ParseFileTags(tagStr string) []*Tag {
 	}
 
 	return tags
+}
+
+func ParseFileAnnotations(commentGroup *ast.CommentGroup) []*Annotate {
+	var annotates []*Annotate
+
+	if commentGroup == nil {
+		return annotates
+	}
+
+	for _, comment := range commentGroup.List {
+		if comment == nil {
+			continue
+		}
+
+		text := comment.Text
+		text = strings.TrimSpace(text)
+		text = strings.TrimPrefix(text, "//")
+		text = strings.TrimSpace(text)
+
+		if !strings.HasPrefix(text, "@polygon") {
+			continue
+		}
+
+		text = strings.TrimPrefix(text, "@polygon")
+		text = strings.TrimSpace(text)
+
+		if text == "" {
+			continue
+		}
+
+		annotate := &Annotate{
+			Name:      text,
+			Variables: make(map[string]string),
+		}
+
+		spaceIndex := strings.Index(text, " ")
+		if spaceIndex > 0 {
+			annotate.Name = text[:spaceIndex]
+			varsText := strings.TrimSpace(text[spaceIndex:])
+
+			parts := strings.Fields(varsText)
+			for _, part := range parts {
+				colonIndex := strings.Index(part, ":")
+				if colonIndex > 0 {
+					key := part[:colonIndex]
+					value := part[colonIndex+1:]
+					annotate.Variables[key] = value
+				}
+			}
+		}
+
+		annotates = append(annotates, annotate)
+	}
+
+	return annotates
 }
