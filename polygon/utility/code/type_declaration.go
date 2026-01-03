@@ -3,9 +3,10 @@ package code
 import "go/ast"
 
 type Interface struct {
-	Name    *string       `json:"name"`
-	Node    *ast.TypeSpec `json:"node"`
-	Methods []*Function   `json:"methods"`
+	Name      *string       `json:"name"`
+	Node      *ast.TypeSpec `json:"node"`
+	Methods   []*Function   `json:"methods"`
+	Annotates []*Annotate   `json:"annotates"`
 }
 
 type Struct struct {

@@ -18,9 +18,10 @@ func ParseFileInterface(ctx context.Context, node *ast.TypeSpec, file *ast.File,
 	}
 
 	iface := &Interface{
-		Name:    &node.Name.Name,
-		Node:    node,
-		Methods: []*Function{},
+		Name:      &node.Name.Name,
+		Node:      node,
+		Methods:   []*Function{},
+		Annotates: ParseFileAnnotations(doc),
 	}
 
 	if interfaceType, ok := node.Type.(*ast.InterfaceType); ok && interfaceType.Methods != nil {
