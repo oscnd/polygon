@@ -82,7 +82,7 @@ func ParseFile(ctx context.Context, pkg *Package, filePath string) (*File, error
 
 					// * check if it's an interface
 					if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
-						iface := ParseFileInterface(ctx, typeSpec, node)
+						iface := ParseFileInterface(ctx, typeSpec, node, typedNode.Doc)
 						if iface != nil {
 							file.Interfaces = append(file.Interfaces, iface)
 						}
@@ -90,7 +90,7 @@ func ParseFile(ctx context.Context, pkg *Package, filePath string) (*File, error
 
 					// * check if it's a struct
 					if _, ok := typeSpec.Type.(*ast.StructType); ok {
-						strct := ParseFileStruct(ctx, typeSpec, node)
+						strct := ParseFileStruct(ctx, typeSpec, node, typedNode.Doc)
 						if strct != nil {
 							file.Structs = append(file.Structs, strct)
 						}

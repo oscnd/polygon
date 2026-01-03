@@ -295,3 +295,70 @@ func safeString(s *string) string {
 	}
 	return *s
 }
+
+func TestParseFileAnnotations(t *testing.T) {
+	// Test parsing @polygon annotations
+	ctx := context.Background()
+	samplePath := "../../../example/sample"
+	pkg := &Package{
+		Path:        &samplePath,
+		Package:     &[]string{"sample"}[0],
+		PackageName: &[]string{"sample"}[0],
+		Files:       make(map[string]*File),
+	}
+
+	// Test struct annotations
+	typesFile, err := ParseFile(ctx, pkg, samplePath+"/types.go")
+	if err != nil {
+		t.Fatalf("Failed to parse types.go: %v", err)
+	}
+
+	var userStruct *Struct
+	for _, strct := range typesFile.Structs {
+		if strct.Name != nil && *strct.Name == "User" {
+			userStruct = strct
+			break
+		}
+	}
+
+	if userStruct == nil {
+		t.Fatal("User struct not found")
+	}
+
+	t.Logf("User struct has %d annotations", len(userStruct.Annotates))
+	for _, ann := range userStruct.Annotates {
+		t.Logf("  - Name: %s, Variables: %v", ann.Name, ann.Variables)
+	}
+
+	// Test function annotations
+	serviceFile, err := ParseFile(ctx, pkg, samplePath+"/service.go")
+	if err != nil {
+		t.Fatalf("Failed to parse service.go: %v", err)
+	}
+
+	var processUserFunc *Function
+	for _, fn := range serviceFile.Functions {
+		if fn.Name != nil && *fn.Name == "ProcessUser" {
+			processUserFunc = fn
+			break
+		}
+	}
+
+	if processUserFunc == nil {
+		t.Fatal("ProcessUser function not found")
+	}
+
+	t.Logf("ProcessUser function has %d annotations", len(processUserFunc.Annotates))
+	for _, ann := range processUserFunc.Annotates {
+		t.Logf("  - Name: %s, Variables: %v", ann.Name, ann.Variables)
+	}
+
+	// Verify expected annotations
+	if len(userStruct.Annotates) != 2 {
+		t.Errorf("Expected 2 annotations for User struct, got %d", len(userStruct.Annotates))
+	}
+
+	if len(processUserFunc.Annotates) != 2 {
+		t.Errorf("Expected 2 annotations for ProcessUser function, got %d", len(processUserFunc.Annotates))
+	}
+}

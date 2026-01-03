@@ -8,7 +8,7 @@ import (
 	"go.scnd.dev/open/polygon"
 )
 
-func ParseFileInterface(ctx context.Context, node *ast.TypeSpec, file *ast.File) *Interface {
+func ParseFileInterface(ctx context.Context, node *ast.TypeSpec, file *ast.File, doc *ast.CommentGroup) *Interface {
 	// * start span
 	s, ctx := polygon.With(ctx)
 	defer s.End()
@@ -63,7 +63,7 @@ func ParseFileInterface(ctx context.Context, node *ast.TypeSpec, file *ast.File)
 	return iface
 }
 
-func ParseFileStruct(ctx context.Context, node *ast.TypeSpec, file *ast.File) *Struct {
+func ParseFileStruct(ctx context.Context, node *ast.TypeSpec, file *ast.File, doc *ast.CommentGroup) *Struct {
 	// * start span
 	s, ctx := polygon.With(ctx)
 	defer s.End()
@@ -77,7 +77,7 @@ func ParseFileStruct(ctx context.Context, node *ast.TypeSpec, file *ast.File) *S
 		Node:      node,
 		Fields:    []*Field{},
 		Receivers: []*Receiver{},
-		Annotates: ParseFileAnnotations(node.Doc),
+		Annotates: ParseFileAnnotations(doc),
 	}
 
 	if structType, ok := node.Type.(*ast.StructType); ok && structType.Fields != nil {

@@ -13,6 +13,8 @@ func NewService(repo Repository) *Service {
 }
 
 // ProcessUser processes a user
+// @polygon handler
+// @polygon auth required:true
 func (s *Service) ProcessUser(user *User) error {
 	if err := s.repo.Create(user); err != nil {
 		return fmt.Errorf("failed to create user: %w", err)

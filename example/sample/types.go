@@ -3,6 +3,8 @@ package sample
 import "time"
 
 // User represents a simple user struct
+// @polygon sql/table
+// @polygon sql/override name:users
 type User struct {
 	ID        uint64    `json:"id"`
 	Name      string    `json:"name"`
