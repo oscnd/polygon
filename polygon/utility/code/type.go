@@ -40,8 +40,9 @@ type Parameter struct {
 }
 
 type Struct struct {
-	Name   *string  `json:"name"`
-	Fields []*Field `json:"fields"`
+	Name      *string     `json:"name"`
+	Fields    []*Field    `json:"fields"`
+	Receivers []*Receiver `json:"receivers"`
 }
 
 type Field struct {

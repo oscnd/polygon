@@ -2,7 +2,6 @@ package code
 
 import (
 	"context"
-	"fmt"
 	"go/parser"
 	"go/token"
 	"log"
@@ -119,7 +118,7 @@ func ParsePackagePackageName(ctx context.Context, absolutePath string) (string, 
 		return "", s.Error("failed to read directory", err)
 	}
 
-	// * find the first .go file (excluding test files) to extract package name
+	// * find the first go file to extract package name
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
 			continue

@@ -46,6 +46,7 @@ func ParsePackageFile(ctx context.Context, pkg *Package, filePath string) (*File
 	}
 
 	// * walk the AST to extract types and functions
+	receiverTypeMap := make(map[*Receiver]string)
 	ast.Inspect(node, func(n ast.Node) bool {
 		switch typedNode := n.(type) {
 		case *ast.GenDecl:
@@ -88,6 +89,10 @@ func ParsePackageFile(ctx context.Context, pkg *Package, filePath string) (*File
 				receiver := ParsePackageReceiver(typedNode, node)
 				if receiver != nil {
 					file.Receivers = append(file.Receivers, receiver)
+					// * store receiver type for association
+					recv := typedNode.Recv.List[0]
+					recvType := ExprToString(recv.Type)
+					receiverTypeMap[receiver] = recvType
 				}
 
 				// * also add the method to functions
@@ -100,6 +105,27 @@ func ParsePackageFile(ctx context.Context, pkg *Package, filePath string) (*File
 
 		return true
 	})
+
+	// * associate receivers with their structs
+	for _, receiver := range file.Receivers {
+		recvType, ok := receiverTypeMap[receiver]
+		if !ok || recvType == "" {
+			continue
+		}
+		// * find struct by receiver type name
+		for _, strct := range file.Structs {
+			if strct.Name == nil {
+				continue
+			}
+			// * handle pointer receivers
+			structName := *strct.Name
+			if recvType == structName || recvType == "*"+structName {
+				receiver.Struct = strct
+				strct.Receivers = append(strct.Receivers, receiver)
+				break
+			}
+		}
+	}
 
 	return file, nil
 }
@@ -160,8 +186,9 @@ func ParsePackageStruct(node *ast.TypeSpec, file *ast.File) *Struct {
 	}
 
 	strct := &Struct{
-		Name:   &node.Name.Name,
-		Fields: []*Field{},
+		Name:      &node.Name.Name,
+		Fields:    []*Field{},
+		Receivers: []*Receiver{},
 	}
 
 	if structType, ok := node.Type.(*ast.StructType); ok && structType.Fields != nil {
